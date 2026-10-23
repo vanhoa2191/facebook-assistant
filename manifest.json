@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Facebook AI Assistant",
-  "version": "0.4.0",
+  "version": "0.5.0",
   "description": "Trợ lý AI Facebook: quản lý nhóm, bản nháp, Gemini, Page Graph API và lịch nhắc việc.",
   "permissions": [
     "storage",

@@ -31,6 +31,8 @@
   let aiKeyPresent = false;
   let aiPermissionPresent = false;
   let aiOutput = '';
+  let draftQuery = '';
+  let draftKindFilter = 'all';
 
   function field(label, id, value, type) {
     return '<div class="field"><label for="' + esc(id) + '">' + esc(label) + '</label><input id="' + esc(id) + '" type="' + (type || 'text') + '" value="' + esc(value == null ? '' : value) + '"></div>';
@@ -151,8 +153,33 @@
         (t.status === 'due' ? button('Hoàn thành', 'completeTask', 'primary', t.id) : '') + button('Xóa', 'deleteTask', 'warn', t.id) + '</div></div>').join('') || '<div class="placeholder">Chưa có lịch.</div>') + '</section></div>';
   }
   function renderLogs() {
-    return '<section class="panel"><h2>Nhật ký và sao lưu</h2><p>Lịch sử thao tác trong extension</p><div class="btnrow">' + button('Xuất nhật ký CSV', 'exportLogs', 'primary') + button('Xóa nhật ký', 'clearLogs', 'warn') + '</div>' +
-      (state.logs.slice().reverse().map(log => '<div class="log"><time>' + esc(log.at) + '</time>' + esc(log.message) + '</div>').join('') || '<div class="placeholder">Chưa có nhật ký.</div>') + '</section>';
+    const query = draftQuery.trim().toLowerCase();
+    const filtered = state.drafts.slice().reverse().filter(draft => {
+      const kind = draft.kind || 'source';
+      const matchesKind = draftKindFilter === 'all' || kind === draftKindFilter;
+      const matchesQuery = !query || draft.text.toLowerCase().includes(query) ||
+        String(draft.targetGroupName || '').toLowerCase().includes(query) ||
+        String(draft.url || '').toLowerCase().includes(query);
+      return matchesKind && matchesQuery;
+    });
+    const library = filtered.length
+      ? '<div class="draft-list">' + filtered.map(draft =>
+          '<article class="draft"><div class="draft-meta"><span class="pill">' + esc(draft.kind || 'source') + '</span><time>' + esc(draft.createdAt) + '</time></div>' +
+          (draft.targetGroupName ? '<div class="draft-target">Nhóm đích: ' + esc(draft.targetGroupName) + '</div>' : '') +
+          '<p class="draft-text">' + esc(draft.text.slice(0, 700)) + (draft.text.length > 700 ? '…' : '') + '</p>' +
+          '<div class="btnrow">' + button('Sao chép', 'copyDraft', '', draft.id) + button('Sửa', 'editDraft', '', draft.id) +
+          (draft.targetGroupUrl ? button('Mở nhóm', 'openDraftGroup', '', draft.id) : '') +
+          button('Xóa', 'deleteDraft', 'warn', draft.id) + '</div></article>'
+        ).join('') + '</div>'
+      : '<div class="placeholder">Không tìm thấy bản nháp phù hợp.</div>';
+    return '<div class="grid"><section class="panel"><h2>Nhật ký hoạt động</h2><p>Lịch sử thao tác trong extension</p><div class="btnrow">' + button('Xuất nhật ký CSV', 'exportLogs', 'primary') + button('Xóa nhật ký', 'clearLogs', 'warn') + '</div>' +
+      (state.logs.slice().reverse().map(log => '<div class="log"><time>' + esc(log.at) + '</time>' + esc(log.message) + '</div>').join('') || '<div class="placeholder">Chưa có nhật ký.</div>') +
+      '</section><section class="panel blue"><h2>Thư viện bản nháp</h2><p>' + filtered.length + ' bản nháp phù hợp</p>' +
+      '<div class="field"><label for="draftQuery">Tìm nội dung, nhóm hoặc URL</label><input id="draftQuery" value="' + esc(draftQuery) + '" maxlength="200" placeholder="Nhập từ khóa..."></div>' +
+      '<div class="field"><label for="draftKindFilter">Loại bản nháp</label><select id="draftKindFilter">' +
+      [['all','Tất cả'],['source','Nguồn'],['share','Chia sẻ'],['ai','AI']].map(item => '<option value="' + item[0] + '" ' + (draftKindFilter === item[0] ? 'selected' : '') + '>' + item[1] + '</option>').join('') +
+      '</select></div><div class="btnrow">' + button('Tìm kiếm', 'filterDrafts', 'primary') + button('Xóa bộ lọc', 'clearDraftFilter') + '</div>' +
+      '<div class="banner">Bản nháp chỉ được lưu cục bộ. Kiểm tra nội dung trước khi sao chép hoặc sử dụng bên ngoài.</div>' + library + '</section></div>';
   }
   function renderPage() {
     if (page === 'groups') return renderGroups();
@@ -538,6 +565,16 @@
         log('Đã lưu ghi chú: ' + TITLES[page]);
         break;
       }
+      case 'filterDrafts':
+        draftQuery = ($('#draftQuery') ? $('#draftQuery').value : '').slice(0, 200);
+        draftKindFilter = ($('#draftKindFilter') ? $('#draftKindFilter').value : 'all');
+        render();
+        return;
+      case 'clearDraftFilter':
+        draftQuery = '';
+        draftKindFilter = 'all';
+        render();
+        return;
       case 'exportLogs': {
         const csv = Core.toCsv([['Thời gian', 'Nội dung']].concat(state.logs.map(item => [item.at, item.message])));
         download('facebook-ai-logs.csv', '\ufeff' + csv, 'text/csv;charset=utf-8');

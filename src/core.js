@@ -103,6 +103,41 @@
     });
   }
 
+  function parseCsv(input) {
+    if (typeof input !== 'string' || input.length > 5000000) throw new Error('CSV không hợp lệ hoặc vượt quá 5 MB.');
+    const rows = [];
+    let row = [];
+    let field = '';
+    let quoted = false;
+    for (let i = 0; i < input.length; i += 1) {
+      const ch = input[i];
+      if (quoted) {
+        if (ch === '"') {
+          if (input[i + 1] === '"') { field += '"'; i += 1; }
+          else quoted = false;
+        } else field += ch;
+      } else if (ch === '"') {
+        if (field.length) throw new Error('CSV có dấu ngoặc kép không đúng vị trí.');
+        quoted = true;
+      } else if (ch === ',') {
+        row.push(field); field = '';
+      } else if (ch === '\r' || ch === '\n') {
+        if (ch === '\r' && input[i + 1] === '\n') i += 1;
+        row.push(field); field = '';
+        if (row.some(value => value.length) || rows.length === 0) rows.push(row);
+        row = [];
+        if (rows.length > 10001) throw new Error('CSV có quá nhiều dòng.');
+      } else field += ch;
+    }
+    if (quoted) throw new Error('CSV có dấu ngoặc kép chưa đóng.');
+    if (field.length || row.length) {
+      row.push(field);
+      if (row.some(value => value.length)) rows.push(row);
+    }
+    if (rows.some(values => values.length > 20)) throw new Error('CSV có quá nhiều cột.');
+    return rows;
+  }
+
   function toCsv(rows) {
     return rows.map(row => row.map(value => {
       let text = String(value == null ? '' : value);
@@ -111,5 +146,5 @@
     }).join(',')).join('\r\n');
   }
 
-  return { createDefaultState, escapeHtml, isSafeFacebookGroupUrl, isValidState, fillPrompt, toCsv };
+  return { createDefaultState, escapeHtml, isSafeFacebookGroupUrl, isValidState, fillPrompt, parseCsv, toCsv };
 });

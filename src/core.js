@@ -18,6 +18,7 @@
       tasks: [],
       logs: [],
       drafts: [],
+      pageSchedules: [],
       moduleNotes: {},
       prompts: {
         share: 'Viết lời dẫn ngắn, tự nhiên, phù hợp với {groupName}, dựa trên nội dung: {postText}. Không thêm thông tin chưa được xác minh.',
@@ -72,7 +73,7 @@
 
   function isValidState(value) {
     if (!isObject(value) || !isObject(value.settings) || !isObject(value.prompts)) return false;
-    const arrayKeys = ['groups', 'profiles', 'tasks', 'logs', 'drafts'];
+    const arrayKeys = ['groups', 'profiles', 'tasks', 'logs', 'drafts', 'pageSchedules'];
     if (!arrayKeys.every(key => isBoundedArray(value[key]))) return false;
     if (!isObject(value.moduleNotes) && value.moduleNotes !== undefined) return false;
 
@@ -102,6 +103,15 @@
       (task.draftId === undefined || isText(task.draftId, 100)))) return false;
     if (!value.logs.every(log => isObject(log) &&
       isText(log.at, 100) && isText(log.message, 2000))) return false;
+    if (!value.pageSchedules.every(item => isObject(item) &&
+      isText(item.id, 100) && item.id.length > 0 &&
+      isText(item.pageId, 30) && /^[0-9]{5,30}$/.test(item.pageId) &&
+      isText(item.message, 60000) && item.message.trim().length > 0 &&
+      isText(item.link, 2048) &&
+      (!item.link || /^https:\/\//i.test(item.link)) &&
+      isText(item.scheduledAt, 100) && Number.isFinite(Date.parse(item.scheduledAt)) &&
+      isText(item.createdAt, 100) && Number.isFinite(Date.parse(item.createdAt)) &&
+      (item.status === undefined || item.status === 'scheduled'))) return false;
     if (!value.drafts.every(draft => isObject(draft) &&
       isText(draft.id, 100) && isText(draft.text, 20000) &&
       isText(draft.url, 2048) && isText(draft.createdAt, 100) &&

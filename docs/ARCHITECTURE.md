@@ -2,7 +2,7 @@
 
 - manifest.json: Manifest V3 metadata, storage and alarms permissions, optional Gemini API host permission.
 - dashboard.html: extension dashboard.
-- src/core.js: state defaults, validation, safe prompt interpolation, HTML escaping, CSV output.
+- src/core.js: state defaults, migration, validation, safe Facebook URL checks, prompt interpolation, HTML escaping, CSV parsing/output.
 - src/ai-provider.js: Gemini API adapter with model validation, timeout, response parsing, and normalized errors.
 - src/facebook-provider.js: versioned Facebook Pages Graph API adapter with token in POST body, timeout, and normalized errors.
 - src/app.js: navigation, group list, AI generation, drafts, reminders, import/export, and logs.
@@ -11,7 +11,7 @@
 - scripts/: extension validation and ZIP packaging.
 - .github/workflows/ci.yml: GitHub Actions validation and package workflow.
 
-Application state is stored in chrome.storage.local. Gemini API key and Facebook Page access token are stored separately in chrome.storage.session and are never included in exports or logs. The key remains accessible to the extension during the current Chrome session.
+Application state, manual engagement follow-up items, reminder tasks, and local records of Meta-scheduled Page posts are stored in chrome.storage.local. Gemini API key and Facebook Page access token are stored separately in chrome.storage.session and are never included in exports or logs. The key remains accessible to the extension during the current Chrome session.
 
 Gemini permission is optional and requested after a user gesture. Requests use HTTPS, send the key in the x-goog-api-key header rather than the URL, apply a timeout, and limit prompt size. Google receives the prompt and input text when a request is made.
 

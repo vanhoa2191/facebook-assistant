@@ -67,3 +67,33 @@ test('handles network failure, timeout, and responses without post IDs', async (
     pageId: '12345678', accessToken: 'test-page-token-12345', message: 'hello', fetchImpl: slow, timeoutMs: 1000
   }), /hết thời gian chờ/);
 });
+
+
+test('schedules a Page post in Meta using published=false and a Unix timestamp', async () => {
+  let request;
+  const scheduledPublishAt = new Date(Date.now() + 60 * 60 * 1000).toISOString();
+  const fetchImpl = async (url, options) => {
+    request = { url, options };
+    return { ok: true, status: 200, json: async () => ({ id: '12345678_22222222' }) };
+  };
+  const result = await Facebook.publishPagePost({
+    pageId: '12345678', accessToken: 'test-page-token-12345',
+    message: 'Scheduled Page post', scheduledPublishAt, version: 'v26.0', fetchImpl
+  });
+  const body = new URLSearchParams(request.options.body);
+  assert.equal(body.get('published'), 'false');
+  assert.equal(Number(body.get('scheduled_publish_time')), Math.floor(Date.parse(scheduledPublishAt) / 1000));
+  assert.equal(result.scheduled, true);
+  assert.equal(result.id, '12345678_22222222');
+});
+
+test('rejects Page scheduling less than 10 minutes or more than 30 days ahead', async () => {
+  const fetchImpl = async () => ({ ok: true, status: 200, json: async () => ({ id: '12345678_1' }) });
+  const base = { pageId: '12345678', accessToken: 'test-page-token-12345', message: 'Schedule me', fetchImpl };
+  await assert.rejects(Facebook.publishPagePost({
+    ...base, scheduledPublishAt: new Date(Date.now() + 2 * 60 * 1000).toISOString()
+  }), /ít nhất 10 phút/);
+  await assert.rejects(Facebook.publishPagePost({
+    ...base, scheduledPublishAt: new Date(Date.now() + 31 * 24 * 60 * 60 * 1000).toISOString()
+  }), /tối đa 30 ngày/);
+});

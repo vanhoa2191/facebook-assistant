@@ -120,3 +120,20 @@ test('CSV parser rejects malformed quoting and oversized input', () => {
   assert.throws(() => Core.parseCsv('a"b,c'), /không đúng vị trí/);
   assert.throws(() => Core.parseCsv('x'.repeat(5000001)), /5 MB/);
 });
+
+
+test('legacy settings migrate prompt defaults and old reminders without losing groups', () => {
+  const legacy = Core.createDefaultState();
+  legacy.prompts = { share: 'Hello {groupName}' };
+  legacy.tasks.push({ id: 't-old', name: 'Old reminder', time: '2026-10-24T09:00' });
+  legacy.groups.push({ id: 'g-old', name: 'Old group', url: 'https://www.facebook.com/groups/old', selected: true });
+  const migrated = Core.migrateState(legacy);
+  assert.equal(migrated.groups[0].id, 'g-old');
+  assert.equal(migrated.tasks[0].status, 'scheduled');
+  assert.ok(migrated.prompts.general.includes('{content}'));
+  assert.equal(Core.isValidState(migrated), true);
+});
+
+test('CSV parser rejects characters after a closing quote', () => {
+  assert.throws(() => Core.parseCsv('"closed"x,value'), /sau dấu ngoặc kép đóng/);
+});

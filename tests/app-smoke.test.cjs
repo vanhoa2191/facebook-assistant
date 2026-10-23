@@ -98,4 +98,10 @@ test('navigation opens the AI and sales modules without runtime errors', async (
   } } });
   assert.match(elements['#view'].innerHTML, /moduleOutput/);
   assert.match(elements['#view'].innerHTML, /Lưu kết quả AI thành nháp/);
+
+  click({ target: { closest(selector) {
+    return selector === '[data-nav]' ? { dataset: { nav: 'schedule' } } : null;
+  } } });
+  assert.equal(elements['#pageTitle'].textContent, 'Lịch chạy');
+  assert.match(elements['#view'].innerHTML, /taskDraftId/);
 });

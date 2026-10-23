@@ -8,7 +8,7 @@ Chrome Extension Manifest V3 with a Vietnamese dashboard for managing Facebook c
 - Local group list management, selection, and safe URL validation.
 - Gemini API adapter with optional host permission, timeout, and session-only API key storage.
 - Manual Meta AI workflow: copy a prompt to another AI tool and save its result as a draft.
-- Group CSV import/export, per-group share drafts, manual group opening, and a searchable draft library.
+- Group CSV import/export, per-group share drafts, manual group opening, a searchable draft library, and a manual engagement follow-up tracker.
 - Optional Facebook Pages Graph API publishing and native Meta scheduling, using a Page access token, explicit host permission, and confirmation before public actions.
 - AI-generated content and share copy are saved as drafts for review.
 - Share-post drafts, Chrome Alarms reminders, activity log, and JSON/CSV export.

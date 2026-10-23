@@ -58,9 +58,9 @@
     try {
       const url = new URL(value);
       const host = url.hostname.toLowerCase();
-      const facebookHost = host === 'facebook.com' || host.endsWith('.facebook.com');
-      return url.protocol === 'https:' && facebookHost && !url.username && !url.password &&
-        /^\/groups\/[^/]+(?:\/|$)/i.test(url.pathname);
+      const facebookHosts = ['facebook.com', 'www.facebook.com', 'm.facebook.com', 'web.facebook.com'];
+      return url.protocol === 'https:' && !url.port && facebookHosts.includes(host) &&
+        !url.username && !url.password && /^\/groups\/[^/]+(?:\/|$)/i.test(url.pathname);
     } catch (_) {
       return false;
     }

@@ -484,6 +484,7 @@
       case 'copyAiPrompt': {
         const input = $('#aiInput').value.trim();
         const template = $('#aiPrompt').value.trim();
+        state.prompts.general = template.slice(0, 20000);
         let prompt = Core.fillPrompt(template, { content: input });
         if (input && !template.includes('{content}')) prompt += '\n\nNội dung cần xử lý:\n' + input;
         try {
@@ -497,6 +498,7 @@
       case 'saveExternalAiDraft': {
         const output = $('#aiExternalOutput').value.trim();
         if (!output || output.length > 20000) { toast('Dán kết quả AI hợp lệ trước khi lưu'); return; }
+        state.prompts.general = $('#aiPrompt').value.slice(0, 20000);
         addDraft(output, '', 'ai');
         log('Đã lưu kết quả từ AI bên ngoài');
         break;
@@ -548,6 +550,7 @@
           toast('Link bài viết phải là HTTPS trên facebook.com'); return;
         }
         const selected = state.groups.filter(group => group.selected && Core.isSafeFacebookGroupUrl(group.url));
+        state.prompts.share = $('#sharePrompt').value.slice(0, 20000);
         addDraft(output, postUrl, 'share', selected.length ? selected[0] : null);
         log('Đã lưu lời dẫn chia sẻ từ AI bên ngoài');
         break;

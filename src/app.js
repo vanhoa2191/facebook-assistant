@@ -96,8 +96,10 @@
     return '<div class="grid"><section class="panel blue"><h2>' + esc(title) + '</h2><p>' + esc(description) + '</p>' +
       '<div class="field"><label for="modulePrompt">Prompt</label><textarea id="modulePrompt" maxlength="20000">' + esc(prompt) + '</textarea></div>' +
       '<div class="field"><label for="moduleInput">' + esc(inputLabel) + '</label><textarea id="moduleInput" maxlength="20000" placeholder="Dán nội dung hoặc nhập yêu cầu..."></textarea></div>' +
-      '<div class="btnrow">' + button('Tạo bản nháp bằng Gemini', 'generateModuleDraft', 'primary') + button('Lưu nội dung nguồn', 'saveModuleDraft') + '</div>' +
-      '<div class="banner">' + esc(safetyNote) + '</div><h3>Nháp gần đây</h3>' + draftList(4) +
+      '<div class="btnrow">' + button('Tạo nháp bằng Gemini', 'generateModuleDraft', 'primary') + button('Sao chép prompt', 'copyModulePrompt') + '</div>' +
+      '<div class="field"><label for="moduleOutput">Kết quả từ Meta AI hoặc AI bên ngoài</label><textarea id="moduleOutput" maxlength="20000" placeholder="Dán kết quả AI đã tạo ở bên ngoài..."></textarea></div>' +
+      '<div class="btnrow">' + button('Lưu kết quả AI thành nháp', 'saveModuleOutputDraft') + button('Lưu nội dung nguồn', 'saveModuleDraft') + '</div>' +
+      '<div class="banner">' + esc(safetyNote) + ' Bạn có thể sao chép prompt sang Meta AI hoặc công cụ khác rồi dán kết quả tại đây.</div><h3>Nháp gần đây</h3>' + draftList(4) +
       '</section><section class="panel blue"><h2>Ghi chú nghiệp vụ</h2><div class="field"><label for="moduleNote">Ghi chú nội bộ</label><textarea id="moduleNote" maxlength="2000" placeholder="Ghi yêu cầu cho module này...">' + esc(note) + '</textarea></div>' +
       button('Lưu ghi chú', 'saveNote', 'primary') + '</section></div>';
   }
@@ -130,7 +132,9 @@
       '</section><section class="panel purple"><h2>Soạn nội dung với AI</h2><p>Tạo nháp để đọc và chỉnh sửa trước khi sử dụng</p>' +
       '<div class="field"><label for="aiPrompt">Prompt</label><textarea id="aiPrompt" maxlength="20000">' + esc(prompt) + '</textarea></div>' +
       '<div class="field"><label for="aiInput">Nội dung đầu vào</label><textarea id="aiInput" maxlength="20000" placeholder="Dán nội dung, chủ đề hoặc yêu cầu..."></textarea></div>' +
-      '<div class="btnrow">' + button('Tạo nháp bằng Gemini', 'generateAiDraft', 'primary') + button('Lưu nguyên văn thành nháp', 'saveAiDraft') + '</div>' +
+      '<div class="btnrow">' + button('Tạo nháp bằng Gemini', 'generateAiDraft', 'primary') + button('Sao chép prompt', 'copyAiPrompt') + '</div>' +
+      '<div class="field"><label for="aiExternalOutput">Kết quả từ Meta AI hoặc AI bên ngoài</label><textarea id="aiExternalOutput" maxlength="20000" placeholder="Dán kết quả AI đã tạo ở bên ngoài..."></textarea></div>' +
+      '<div class="btnrow">' + button('Lưu kết quả AI thành nháp', 'saveExternalAiDraft') + button('Lưu nguyên văn đầu vào', 'saveAiDraft') + '</div>' +
       '<h3>Nháp gần đây</h3>' + draftList(5) + '</section></div>';
   }
   function renderShare() {
@@ -138,7 +142,9 @@
       field('Link bài viết Facebook (không bắt buộc)', 'postUrl', '') +
       '<div class="field"><label for="sharePrompt">Prompt — dùng {postText} và {groupName}</label><textarea id="sharePrompt" maxlength="20000">' + esc(state.prompts.share) + '</textarea></div>' +
       '<div class="field"><label for="postText">Nội dung bài gốc</label><textarea id="postText" maxlength="20000" placeholder="Dán nội dung bạn được phép sử dụng"></textarea></div>' +
-      '<div class="btnrow">' + button('Tạo lời dẫn cho nhóm đã chọn', 'generateShareDraft', 'primary') + button('Lưu nội dung thành nháp', 'saveShare') + '</div>' +
+      '<div class="btnrow">' + button('Tạo lời dẫn bằng Gemini', 'generateShareDraft', 'primary') + button('Sao chép prompt', 'copySharePrompt') + '</div>' +
+      '<div class="field"><label for="shareExternalOutput">Kết quả từ Meta AI hoặc AI bên ngoài</label><textarea id="shareExternalOutput" maxlength="20000" placeholder="Dán lời dẫn đã tạo ở bên ngoài..."></textarea></div>' +
+      '<div class="btnrow">' + button('Lưu kết quả thành nháp chia sẻ', 'saveExternalShareDraft') + button('Lưu nội dung nguồn', 'saveShare') + '</div>' +
       '<div class="banner">Tạo tối đa 5 bản nháp mỗi lượt để kiểm soát chi phí AI. Mỗi bản nháp gắn với một nhóm; bạn cần tự xem lại và đăng thủ công.</div></section>' +
       '<section class="panel"><h2>Chọn nhóm nhận bài</h2>' + groupList() + button('Mở tối đa 5 nhóm đã chọn', 'openSelectedGroups') + ' ' + button('Chọn tất cả', 'selectAll') + ' ' + button('Bỏ chọn', 'deselectAll') +
       '<h3>Thư viện bản nháp</h3>' + draftList(10) + '</section></div>';
@@ -475,6 +481,77 @@
         break;
       }
 
+      case 'copyAiPrompt': {
+        const input = $('#aiInput').value.trim();
+        const template = $('#aiPrompt').value.trim();
+        let prompt = Core.fillPrompt(template, { content: input });
+        if (input && !template.includes('{content}')) prompt += '\n\nNội dung cần xử lý:\n' + input;
+        try {
+          await navigator.clipboard.writeText(prompt);
+          log('Đã sao chép prompt AI chung');
+          await save();
+          toast('Đã sao chép prompt. Bạn có thể dán vào Meta AI hoặc AI khác.');
+        } catch (_) { toast('Không sao chép được prompt.'); }
+        return;
+      }
+      case 'saveExternalAiDraft': {
+        const output = $('#aiExternalOutput').value.trim();
+        if (!output || output.length > 20000) { toast('Dán kết quả AI hợp lệ trước khi lưu'); return; }
+        addDraft(output, '', 'ai');
+        log('Đã lưu kết quả từ AI bên ngoài');
+        break;
+      }
+      case 'copyModulePrompt': {
+        const input = $('#moduleInput').value.trim();
+        const template = $('#modulePrompt').value.trim();
+        const promptKey = modulePromptKey();
+        state.prompts[promptKey] = template.slice(0, 20000);
+        let prompt = Core.fillPrompt(template, { content: input });
+        if (input && !template.includes('{content}')) prompt += '\n\nNội dung được cung cấp:\n' + input;
+        try {
+          await navigator.clipboard.writeText(prompt);
+          log('Đã sao chép prompt: ' + TITLES[page]);
+          await save();
+          toast('Đã sao chép prompt cho ' + TITLES[page]);
+        } catch (_) { toast('Không sao chép được prompt.'); }
+        return;
+      }
+      case 'saveModuleOutputDraft': {
+        const output = $('#moduleOutput').value.trim();
+        if (!output || output.length > 20000) { toast('Dán kết quả AI hợp lệ trước khi lưu'); return; }
+        addDraft(output, '', 'ai');
+        log('Đã lưu kết quả AI bên ngoài: ' + TITLES[page]);
+        break;
+      }
+      case 'copySharePrompt': {
+        const postText = $('#postText').value.trim();
+        const selected = state.groups.filter(group => group.selected && Core.isSafeFacebookGroupUrl(group.url));
+        const groupName = selected.length ? selected[0].name : 'nhóm phù hợp';
+        const template = $('#sharePrompt').value.trim();
+        state.prompts.share = template.slice(0, 20000);
+        let prompt = Core.fillPrompt(template, { postText, groupName });
+        if (postText && !template.includes('{postText}')) prompt += '\n\nNội dung bài gốc:\n' + postText;
+        if (!template.includes('{groupName}')) prompt += '\n\nNgữ cảnh nhóm: ' + groupName;
+        try {
+          await navigator.clipboard.writeText(prompt);
+          log('Đã sao chép prompt chia sẻ');
+          await save();
+          toast('Đã sao chép prompt chia sẻ');
+        } catch (_) { toast('Không sao chép được prompt.'); }
+        return;
+      }
+      case 'saveExternalShareDraft': {
+        const output = $('#shareExternalOutput').value.trim();
+        const postUrl = $('#postUrl').value.trim();
+        if (!output || output.length > 20000) { toast('Dán kết quả AI hợp lệ trước khi lưu'); return; }
+        if (postUrl && (!/^https:\/\/(www\.)?facebook\.com\//i.test(postUrl) || postUrl.length > 2048)) {
+          toast('Link bài viết phải là HTTPS trên facebook.com'); return;
+        }
+        const selected = state.groups.filter(group => group.selected && Core.isSafeFacebookGroupUrl(group.url));
+        addDraft(output, postUrl, 'share', selected.length ? selected[0] : null);
+        log('Đã lưu lời dẫn chia sẻ từ AI bên ngoài');
+        break;
+      }
       case 'saveAiDraft': {
         const input = $('#aiInput').value.trim();
         if (!input || input.length > 20000) { toast('Nhập nội dung đầu vào hợp lệ'); return; }

@@ -53,7 +53,7 @@
     return '<div class="draft-list">' + drafts.map(draft =>
       '<article class="draft"><div class="draft-meta"><span class="pill">' + esc(draft.kind || 'source') + '</span><time>' + esc(draft.createdAt) + '</time></div>' +
       '<p class="draft-text">' + esc(draft.text.slice(0, 700)) + (draft.text.length > 700 ? '…' : '') + '</p>' +
-      '<div class="btnrow">' + button('Sao chép', 'copyDraft', '', draft.id) + button('Xóa', 'deleteDraft', 'warn', draft.id) + '</div></article>'
+      '<div class="btnrow">' + button('Sao chép', 'copyDraft', '', draft.id) + button('Sửa', 'editDraft', '', draft.id) + button('Xóa', 'deleteDraft', 'warn', draft.id) + '</div></article>'
     ).join('') + '</div>';
   }
 
@@ -117,7 +117,7 @@
       '<div class="status-box"><span class="pill">' + (aiPermissionPresent ? 'Đã cấp quyền API' : 'Chưa cấp quyền API') + '</span> <span class="pill">' + (aiKeyPresent ? 'Đã có khóa trong phiên' : 'Chưa lưu khóa') + '</span></div>' +
       '<div id="aiOutput" class="placeholder output">' + esc(aiOutput || 'Kết quả kiểm tra hoặc nội dung AI sẽ hiển thị tại đây.') + '</div>' +
       button('Lưu cấu hình AI', 'saveSettings', 'primary') +
-      '<h3>Hồ sơ theo chức năng</h3>' + (state.profiles.map(p => '<div class="log"><strong>' + esc(p.name) + '</strong> · ' + esc(p.provider) + (p.model ? ' · ' + esc(p.model) : '') + ' ' + button('Xóa', 'deleteProfile', 'warn compact', p.id) + '</div>').join('') || '<div class="placeholder">Chưa có hồ sơ.</div>') +
+      '<h3>Hồ sơ theo chức năng</h3>' + (state.profiles.map(p => '<div class="log"><strong>' + esc(p.name) + '</strong> · ' + esc(p.provider) + (p.model ? ' · ' + esc(p.model) : '') + ' ' + button('Dùng hồ sơ', 'useProfile', 'primary compact', p.id) + ' ' + button('Xóa', 'deleteProfile', 'warn compact', p.id) + '</div>').join('') || '<div class="placeholder">Chưa có hồ sơ.</div>') +
       field('Tên hồ sơ mới', 'profileName', '') + button('Thêm hồ sơ', 'addProfile') +
       '</section><section class="panel purple"><h2>Soạn nội dung với AI</h2><p>Tạo nháp để đọc và chỉnh sửa trước khi sử dụng</p>' +
       '<div class="field"><label for="aiPrompt">Prompt</label><textarea id="aiPrompt" maxlength="20000">' + esc(prompt) + '</textarea></div>' +
@@ -261,7 +261,7 @@
       case 'addProfile': {
         const nameValue = $('#profileName').value.trim();
         if (!nameValue || nameValue.length > 200) { toast('Nhập tên hồ sơ hợp lệ'); return; }
-        state.profiles.push({ id: crypto.randomUUID(), name: nameValue, provider: $('#provider').value });
+        state.profiles.push({ id: crypto.randomUUID(), name: nameValue, provider: $('#provider').value, model: $('#model').value.trim().slice(0, 120), prompt: $('#aiPrompt').value.slice(0, 20000) });
         log('Đã thêm hồ sơ ' + nameValue);
         break;
       }
@@ -283,6 +283,15 @@
         state.groups = state.groups.filter(group => group.id !== id);
         log('Đã xóa một nhóm khỏi danh sách');
         break;
+      case 'useProfile': {
+        const profile = state.profiles.find(item => item.id === id);
+        if (!profile) { toast('Không tìm thấy hồ sơ AI'); return; }
+        state.settings.provider = ['demo', 'gemini', 'meta'].includes(profile.provider) ? profile.provider : 'demo';
+        state.settings.model = profile.model || state.settings.model;
+        if (profile.prompt) state.prompts.general = profile.prompt;
+        log('Đã áp dụng hồ sơ AI: ' + profile.name);
+        break;
+      }
       case 'deleteProfile':
         state.profiles = state.profiles.filter(profile => profile.id !== id);
         log('Đã xóa hồ sơ AI');
@@ -402,6 +411,17 @@
           toast('Đã sao chép nội dung');
         } catch (_) { toast('Không sao chép được. Hãy sao chép thủ công.'); }
         return;
+      }
+      case 'editDraft': {
+        const draft = state.drafts.find(item => item.id === id);
+        if (!draft) { toast('Không tìm thấy bản nháp'); return; }
+        const edited = window.prompt('Chỉnh sửa bản nháp', draft.text);
+        if (edited === null) return;
+        if (!edited.trim() || edited.length > 20000) { toast('Nội dung nháp phải có từ 1 đến 20.000 ký tự'); return; }
+        draft.text = edited.trim();
+        draft.updatedAt = new Date().toISOString();
+        log('Đã chỉnh sửa bản nháp');
+        break;
       }
       case 'deleteDraft':
         state.drafts = state.drafts.filter(draft => draft.id !== id);

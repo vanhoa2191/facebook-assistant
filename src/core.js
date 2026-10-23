@@ -20,7 +20,12 @@
       drafts: [],
       moduleNotes: {},
       prompts: {
-        share: 'Viết lời dẫn ngắn, tự nhiên, phù hợp với {groupName}, dựa trên nội dung: {postText}. Không thêm thông tin chưa được xác minh.'
+        share: 'Viết lời dẫn ngắn, tự nhiên, phù hợp với {groupName}, dựa trên nội dung: {postText}. Không thêm thông tin chưa được xác minh.',
+        general: 'Bạn là trợ lý biên tập. Hãy viết rõ ràng, tự nhiên, đúng ngữ cảnh. Không bịa dữ kiện. Nội dung đầu vào: {content}',
+        comment: 'Soạn một bình luận hữu ích, lịch sự cho ngữ cảnh sau: {content}',
+        sales: 'Viết bài giới thiệu sản phẩm rõ lợi ích, không phóng đại hoặc thêm dữ kiện chưa cung cấp: {content}',
+        feed: 'Tạo một bản tin ngắn dựa hoàn toàn trên thông tin được cung cấp: {content}',
+        summary: 'Tóm tắt các ý chính, không thêm thông tin ngoài nguồn: {content}'
       }
     };
   }
@@ -82,12 +87,21 @@
     return true;
   }
 
-  function toCsv(rows) {
-    return rows.map(row => row.map(value => {
-      const text = String(value == null ? '' : value);
-      return '"' + text.replace(/"/g, '""') + '"';
-    }).join(',')).join('\r\n');
+  function fillPrompt(template, variables) {
+    const source = String(template == null ? '' : template);
+    const values = variables || {};
+    return source.replace(/\{([a-zA-Z][a-zA-Z0-9_]*)\}/g, (match, key) => {
+      return values[key] == null ? match : String(values[key]);
+    });
   }
 
-  return { createDefaultState, escapeHtml, isSafeFacebookGroupUrl, isValidState, toCsv };
+  function toCsv(rows) {
+    return rows.map(row => row.map(value => {
+      let text = String(value == null ? '' : value);
+      if (/^[=+\\-@\\t\\r]/.test(text)) text = "'" + text;
+      return '"' + text.replace(/"/g, '""') + '"';
+    }).join(',')).join('\\r\\n');
+  }
+
+  return { createDefaultState, escapeHtml, isSafeFacebookGroupUrl, isValidState, fillPrompt, toCsv };
 });

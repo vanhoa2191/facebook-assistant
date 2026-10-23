@@ -55,3 +55,14 @@ test('CSV output quotes commas, quotes, and embedded newlines', () => {
   assert.equal(Core.toCsv([['a', 'b'], ['x,y', 'say "hi"']]), '"a","b"\r\n"x,y","say ""hi"""');
   assert.equal(Core.toCsv([['line1\nline2']]), '"line1\nline2"');
 });
+
+
+test('prompt placeholders are substituted without evaluating unknown names', () => {
+  assert.equal(Core.fillPrompt('For {groupName}: {postText}; {unknown}', {
+    groupName: 'Group A', postText: 'Hello'
+  }), 'For Group A: Hello; {unknown}');
+});
+
+test('CSV protects spreadsheet formulas', () => {
+  assert.equal(Core.toCsv([['=1+1', '+cmd', '-2', '@x']]), '"\'=1+1","\'+cmd","\'-2","\'@x"');
+});

@@ -1,28 +1,19 @@
 # Architecture
 
-## Phase 1 components
-
-- manifest.json: Manifest V3 metadata and minimum permissions.
-- dashboard.html: options-page dashboard opened from the extension action.
-- src/styles.css: responsive UI styles.
-- src/core.js: pure validation and formatting functions shared by the UI and Node.js tests.
-- src/app.js: navigation, local state, group list, AI profile placeholders, drafts, reminders, import/export, and logs.
-- src/background.js: extension lifecycle and dashboard launch.
-- tests/: deterministic unit tests.
+- manifest.json: Manifest V3 metadata, storage and alarms permissions, optional Gemini API host permission.
+- dashboard.html: extension dashboard.
+- src/core.js: state defaults, validation, safe prompt interpolation, HTML escaping, CSV output.
+- src/ai-provider.js: Gemini API adapter with model validation, timeout, response parsing, and normalized errors.
+- src/app.js: navigation, group list, AI generation, drafts, reminders, import/export, and logs.
+- src/background.js: extension lifecycle, reminder alarms, and action badge.
+- tests/: deterministic Node.js unit tests.
 - scripts/: extension validation and ZIP packaging.
-- .github/workflows/ci.yml: GitHub Actions checks.
+- .github/workflows/ci.yml: GitHub Actions validation and package workflow.
 
-## State
+Application state is stored in chrome.storage.local. Gemini API key is stored separately in chrome.storage.session and is never included in exports or logs. The key remains accessible to the extension during the current Chrome session.
 
-The application stores one versioned-shape object under chrome.storage.local key faa.state. Import validation is strict: unknown/malformed nested data is rejected rather than merged. Exported JSON is user-controlled and may contain group URLs, drafts, prompts, and reminders.
+Gemini permission is optional and requested after a user gesture. Requests use HTTPS, send the key in the x-goog-api-key header rather than the URL, apply a timeout, and limit prompt size. Google receives the prompt and input text when a request is made.
 
-## Safety boundary
+Chrome Alarms are used for one-shot reminders. When due, a task is marked due, a log entry is written, and a badge is shown on the extension action. The scheduler does not perform Facebook actions.
 
-Phase 1 requests storage and alarms only. It does not request cookies, tabs, scripting, webRequest, or Facebook host permissions. No Facebook page is scraped or modified. AI provider selections are placeholders and do not send network requests.
-
-## Roadmap
-
-1. Stabilize dashboard, state validation, CI, and packaging.
-2. Add a provider interface with explicit consent, secret handling, request timeouts, and unit tests.
-3. Add supported Facebook integrations only where official APIs and permissions allow.
-4. Add task queue, retry policy, idempotency, and human confirmation for external actions.
+No Facebook host permissions, cookies, page scraping, posting, commenting, friend requests, or group joining are enabled. AI output is saved as a draft for human review.

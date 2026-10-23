@@ -1,14 +1,20 @@
 {
   "manifest_version": 3,
   "name": "Facebook AI Assistant",
-  "version": "0.1.0",
-  "description": "Bảng điều khiển hỗ trợ quản lý nội dung Facebook với AI. Giai đoạn 1 lưu dữ liệu cục bộ.",
-  "permissions": ["storage", "alarms"],
+  "version": "0.2.0",
+  "description": "Bảng điều khiển hỗ trợ quản lý nội dung Facebook với AI và lưu dữ liệu cục bộ.",
+  "permissions": [
+    "storage",
+    "alarms"
+  ],
   "action": {
     "default_title": "Mở Facebook AI Assistant"
   },
   "background": {
     "service_worker": "src/background.js"
   },
-  "options_page": "dashboard.html"
+  "options_page": "dashboard.html",
+  "optional_host_permissions": [
+    "https://generativelanguage.googleapis.com/*"
+  ]
 }

@@ -30,6 +30,23 @@
     };
   }
 
+  function migrateState(value) {
+    const defaults = createDefaultState();
+    if (!isObject(value)) return value;
+    const migrated = {
+      ...defaults,
+      ...value,
+      settings: { ...defaults.settings, ...(isObject(value.settings) ? value.settings : {}) },
+      prompts: { ...defaults.prompts, ...(isObject(value.prompts) ? value.prompts : {}) },
+      moduleNotes: isObject(value.moduleNotes) ? value.moduleNotes : {}
+    };
+    if (Array.isArray(value.tasks)) {
+      migrated.tasks = value.tasks.map(task => isObject(task) && !task.status
+        ? { ...task, status: 'scheduled' } : task);
+    }
+    return migrated;
+  }
+
   function escapeHtml(value) {
     return String(value == null ? '' : value).replace(/[&<>"']/g, function (character) {
       return ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[character];
@@ -109,13 +126,25 @@
     let row = [];
     let field = '';
     let quoted = false;
+    let closedQuote = false;
     for (let i = 0; i < input.length; i += 1) {
       const ch = input[i];
       if (quoted) {
         if (ch === '"') {
           if (input[i + 1] === '"') { field += '"'; i += 1; }
-          else quoted = false;
+          else { quoted = false; closedQuote = true; }
         } else field += ch;
+      } else if (closedQuote) {
+        if (ch === ',') { row.push(field); field = ''; closedQuote = false; }
+        else if (ch === '\r' || ch === '\n') {
+          if (ch === '\r' && input[i + 1] === '\n') i += 1;
+          row.push(field); field = ''; closedQuote = false;
+          if (row.some(value => value.length) || rows.length === 0) rows.push(row);
+          row = [];
+          if (rows.length > 10001) throw new Error('CSV có quá nhiều dòng.');
+        } else if (ch === ' ' || ch === '\t') {
+          continue;
+        } else throw new Error('CSV có ký tự sau dấu ngoặc kép đóng.');
       } else if (ch === '"') {
         if (field.length) throw new Error('CSV có dấu ngoặc kép không đúng vị trí.');
         quoted = true;
@@ -146,5 +175,5 @@
     }).join(',')).join('\r\n');
   }
 
-  return { createDefaultState, escapeHtml, isSafeFacebookGroupUrl, isValidState, fillPrompt, parseCsv, toCsv };
+  return { createDefaultState, migrateState, escapeHtml, isSafeFacebookGroupUrl, isValidState, fillPrompt, parseCsv, toCsv };
 });

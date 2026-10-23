@@ -86,6 +86,7 @@ test('navigation opens the AI and sales modules without runtime errors', async (
   assert.equal(elements['#pageTitle'].textContent, 'Nuôi Page');
   assert.match(elements['#view'].innerHTML, /Page access token/);
   assert.match(elements['#view'].innerHTML, /Đăng bài lên Page/);
+  assert.match(elements['#view'].innerHTML, /pagePublishTime/);
 
   click({ target: { closest(selector) {
     return selector === '[data-nav]' ? { dataset: { nav: 'share' } } : null;
@@ -104,4 +105,5 @@ test('navigation opens the AI and sales modules without runtime errors', async (
   } } });
   assert.equal(elements['#pageTitle'].textContent, 'Lịch chạy');
   assert.match(elements['#view'].innerHTML, /taskDraftId/);
+  assert.match(elements['#view'].innerHTML, /Lịch đăng Facebook Page/);
 });

@@ -136,4 +136,6 @@ test('legacy settings migrate prompt defaults and old reminders without losing g
 
 test('CSV parser rejects characters after a closing quote', () => {
   assert.throws(() => Core.parseCsv('"closed"x,value'), /sau dấu ngoặc kép đóng/);
+  assert.equal(Core.isSafeFacebookGroupUrl('https://evil.facebook.com/groups/example'), false);
+  assert.equal(Core.isSafeFacebookGroupUrl('https://facebook.com:444/groups/example'), false);
 });

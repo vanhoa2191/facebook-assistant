@@ -84,7 +84,12 @@
       isText(log.at, 100) && isText(log.message, 2000))) return false;
     if (!value.drafts.every(draft => isObject(draft) &&
       isText(draft.id, 100) && isText(draft.text, 20000) &&
-      isText(draft.url, 2048) && isText(draft.createdAt, 100))) return false;
+      isText(draft.url, 2048) && isText(draft.createdAt, 100) &&
+      (draft.kind === undefined || ['source', 'share', 'ai'].includes(draft.kind)) &&
+      (draft.targetGroupId === undefined || isText(draft.targetGroupId, 100)) &&
+      (draft.targetGroupName === undefined || isText(draft.targetGroupName, 200)) &&
+      (draft.targetGroupUrl === undefined || isSafeFacebookGroupUrl(draft.targetGroupUrl)) &&
+      (draft.updatedAt === undefined || isText(draft.updatedAt, 100)))) return false;
     if (value.moduleNotes && !Object.entries(value.moduleNotes).every(entry =>
       isText(entry[0], 80) && isText(entry[1], 2000))) return false;
     return true;

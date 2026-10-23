@@ -15,18 +15,20 @@ assert.ok(fs.existsSync(path.join(root, manifest.options_page)), 'options page f
 assert.ok(manifest.background && fs.existsSync(path.join(root, manifest.background.service_worker)), 'service worker must exist');
 assert.ok(Array.isArray(manifest.permissions), 'permissions must be an array');
 assert.deepEqual([...manifest.permissions].sort(), ['alarms', 'storage'], 'Only storage and alarms are required permissions');
-assert.deepEqual(manifest.optional_host_permissions, ['https://generativelanguage.googleapis.com/*'], 'Only Gemini API host permission may be requested optionally');
+assert.deepEqual([...manifest.optional_host_permissions].sort(), ['https://generativelanguage.googleapis.com/*', 'https://graph.facebook.com/*'].sort(), 'Only Gemini and Facebook Graph API host permissions may be requested optionally');
 assert.equal(manifest.host_permissions, undefined, 'No permanent host permissions');
 assert.equal(manifest.content_scripts, undefined, 'No content scripts in this phase');
 
 const dashboard = read('dashboard.html');
 assert.ok(dashboard.includes('src/core.js'), 'core script must be loaded');
 assert.ok(dashboard.includes('src/ai-provider.js'), 'AI provider must be loaded');
+assert.ok(dashboard.includes('src/facebook-provider.js'), 'Facebook Pages provider must be loaded');
 assert.ok(dashboard.includes('src/app.js'), 'app script must be loaded');
 assert.ok(dashboard.indexOf('src/core.js') < dashboard.indexOf('src/app.js'), 'core must load before app');
 assert.ok(dashboard.indexOf('src/ai-provider.js') < dashboard.indexOf('src/app.js'), 'AI provider must load before app');
+assert.ok(dashboard.indexOf('src/facebook-provider.js') < dashboard.indexOf('src/app.js'), 'Facebook provider must load before app');
 
-for (const file of ['src/core.js', 'src/ai-provider.js', 'src/app.js', 'src/background.js', 'src/styles.css']) {
+for (const file of ['src/core.js', 'src/ai-provider.js', 'src/facebook-provider.js', 'src/app.js', 'src/background.js', 'src/styles.css']) {
   assert.ok(fs.statSync(path.join(root, file)).size > 0, file + ' must not be empty');
 }
 const core = require('../src/core.js');

@@ -15,6 +15,6 @@ Application state is stored in chrome.storage.local. Gemini API key and Facebook
 
 Gemini permission is optional and requested after a user gesture. Requests use HTTPS, send the key in the x-goog-api-key header rather than the URL, apply a timeout, and limit prompt size. Google receives the prompt and input text when a request is made.
 
-Chrome Alarms are used for one-shot reminders. When due, a task is marked due, a log entry is written, and a badge is shown on the extension action. The scheduler does not perform Facebook actions.
+Chrome Alarms are used for one-shot reminders. When due, a task is marked due, a log entry is written, and a badge is shown on the extension action. A reminder may link to a saved draft for quick review. Page posts may be scheduled directly through the official Graph API using `published=false` and `scheduled_publish_time` (10 minutes to 30 days ahead). After Meta confirms a scheduled post, the extension records the returned post ID locally and links to Meta Business Suite Planner. It does not claim live publication status without querying Meta.
 
 Optional host permissions are requested only for Gemini and the Facebook Graph API. Page publishing is supported only through the versioned Page feed endpoint with a user-provided Page access token and an explicit confirmation. No cookies access, Facebook scraping, friend requests, group joining, or automatic group/personal-profile posting is implemented. AI output is saved as a draft for human review.

@@ -43,7 +43,7 @@
     if (!state.groups.length) return '<div class="placeholder">Chưa có nhóm. Thêm nhóm thủ công bằng tên và URL để bắt đầu.</div>';
     return '<div class="group-list">' + state.groups.map(group =>
       '<div class="group"><input type="checkbox" aria-label="Chọn ' + esc(group.name) + '" class="group-check" data-id="' + esc(group.id) + '" ' + (group.selected ? 'checked' : '') + '><span class="pill">Nhóm</span><span class="group-name">' + esc(group.name) + '</span>' +
-      button('Xóa', 'deleteGroup', 'warn compact', group.id) + '</div>'
+      button('Mở', 'openGroup', '', group.id) + button('Xóa', 'deleteGroup', 'warn compact', group.id) + '</div>'
     ).join('') + '</div>';
   }
 
@@ -52,8 +52,11 @@
     if (!drafts.length) return '<div class="placeholder">Chưa có bản nháp.</div>';
     return '<div class="draft-list">' + drafts.map(draft =>
       '<article class="draft"><div class="draft-meta"><span class="pill">' + esc(draft.kind || 'source') + '</span><time>' + esc(draft.createdAt) + '</time></div>' +
+      (draft.targetGroupName ? '<div class="draft-target">Nhóm đích: ' + esc(draft.targetGroupName) + '</div>' : '') +
       '<p class="draft-text">' + esc(draft.text.slice(0, 700)) + (draft.text.length > 700 ? '…' : '') + '</p>' +
-      '<div class="btnrow">' + button('Sao chép', 'copyDraft', '', draft.id) + button('Sửa', 'editDraft', '', draft.id) + button('Xóa', 'deleteDraft', 'warn', draft.id) + '</div></article>'
+      '<div class="btnrow">' + button('Sao chép', 'copyDraft', '', draft.id) + button('Sửa', 'editDraft', '', draft.id) +
+      (draft.targetGroupUrl ? button('Mở nhóm', 'openDraftGroup', '', draft.id) : '') +
+      button('Xóa', 'deleteDraft', 'warn', draft.id) + '</div></article>'
     ).join('') + '</div>';
   }
 
@@ -98,13 +101,15 @@
   }
   function renderGroups() {
     return '<div class="grid four">' +
-      '<section class="panel"><h2>Đăng bài AI lên nhóm</h2><p>Quản lý danh sách và chọn nhóm cần đăng</p><div class="metric"><div><small>Tổng nhóm</small>' + state.groups.length + '</div><div><small>Đã chọn</small>' + state.groups.filter(g => g.selected).length + '</div></div>' +
-      groupList() + field('Số nhóm mỗi đợt', 'groupLimit', state.settings.groupLimit, 'number') + field('Khoảng cách (giây)', 'delay', state.settings.delay, 'number') +
-      '<div class="banner">Chưa kết nối Facebook. Chỉ chuẩn bị nội dung và lưu nháp.</div>' + button('Lưu cấu hình', 'saveSettings', 'primary full') + '</section>' +
+      '<section class="panel"><h2>Quản lý nhóm</h2><p>Danh sách nhóm do bạn nhập thủ công</p><div class="metric"><div><small>Tổng nhóm</small>' + state.groups.length + '</div><div><small>Đã chọn</small>' + state.groups.filter(g => g.selected).length + '</div></div>' +
+      groupList() + '<div class="btnrow">' + button('Mở tối đa 5 nhóm đã chọn', 'openSelectedGroups') + button('Chọn tất cả', 'selectAll') + button('Bỏ chọn', 'deselectAll') + '</div>' +
+      field('Số nhóm mỗi đợt (cấu hình)', 'groupLimit', state.settings.groupLimit, 'number') + field('Khoảng cách (giây)', 'delay', state.settings.delay, 'number') +
+      '<div class="banner">Chỉ mở tab nhóm để bạn tự xem và thao tác. Extension không tự đăng, bình luận hoặc gửi lời mời.</div>' + button('Lưu cấu hình', 'saveSettings', 'primary full') + '</section>' +
       '<section class="panel"><h2>Like / Cảm xúc</h2><p>Phân hệ tham khảo · chưa kích hoạt</p><div class="metric"><div><small>Đã thực hiện</small>0</div><div><small>Đã chọn</small>' + state.groups.filter(g => g.selected).length + '</div></div><div class="placeholder">Tương tác tự động chưa được triển khai.</div></section>' +
-      '<section class="panel"><h2>Bình luận AI</h2><p>Chuẩn bị bình luận nháp</p><div class="metric"><div><small>Đã gửi</small>0</div><div><small>Đã chọn</small>' + state.groups.filter(g => g.selected).length + '</div></div><div class="placeholder">Có thể chuẩn bị nháp sau khi tích hợp AI; chưa tự gửi.</div></section>' +
-      '<section class="panel"><h2>Tìm và quản lý nhóm</h2><p>Thêm nhóm mà bạn muốn quản lý</p>' + field('Tên nhóm', 'groupName', '') + field('URL nhóm Facebook', 'groupUrl', '') + button('Thêm nhóm vào danh sách', 'addGroup', 'primary full') + '<div class="banner">Chỉ thêm nhóm thủ công. Không tự tìm hoặc tham gia nhóm.</div></section></div>';
+      '<section class="panel"><h2>Bình luận AI</h2><p>Chuẩn bị bình luận nháp</p><div class="metric"><div><small>Đã gửi</small>0</div><div><small>Đã chọn</small>' + state.groups.filter(g => g.selected).length + '</div></div><div class="placeholder">Tạo và duyệt nháp trước khi đăng thủ công.</div></section>' +
+      '<section class="panel"><h2>Thêm nhóm</h2><p>Nhập tên và URL nhóm Facebook</p>' + field('Tên nhóm', 'groupName', '') + field('URL nhóm Facebook', 'groupUrl', '') + button('Thêm nhóm vào danh sách', 'addGroup', 'primary full') + '<div class="banner">Chỉ thêm nhóm thủ công. Không tự tìm hoặc tham gia nhóm.</div></section></div>';
   }
+
   function renderAI() {
     const options = [['demo', 'Demo (không gửi dữ liệu)'], ['gemini', 'Gemini API'], ['meta', 'Meta AI (chưa có API kết nối)']];
     const prompt = state.prompts.general || 'Hãy biên tập nội dung sau, không thêm dữ kiện: {content}';
@@ -130,11 +135,12 @@
       field('Link bài viết Facebook (không bắt buộc)', 'postUrl', '') +
       '<div class="field"><label for="sharePrompt">Prompt — dùng {postText} và {groupName}</label><textarea id="sharePrompt" maxlength="20000">' + esc(state.prompts.share) + '</textarea></div>' +
       '<div class="field"><label for="postText">Nội dung bài gốc</label><textarea id="postText" maxlength="20000" placeholder="Dán nội dung bạn được phép sử dụng"></textarea></div>' +
-      '<div class="btnrow">' + button('Tạo lời dẫn bằng Gemini', 'generateShareDraft', 'primary') + button('Lưu nội dung thành nháp', 'saveShare') + '</div>' +
-      '<div class="banner">Chưa tự động đăng hoặc chia sẻ. Nháp được lưu trên trình duyệt.</div></section>' +
-      '<section class="panel"><h2>Chọn nhóm nhận bài</h2>' + groupList() + button('Chọn tất cả', 'selectAll') + ' ' + button('Bỏ chọn', 'deselectAll') +
+      '<div class="btnrow">' + button('Tạo lời dẫn cho nhóm đã chọn', 'generateShareDraft', 'primary') + button('Lưu nội dung thành nháp', 'saveShare') + '</div>' +
+      '<div class="banner">Tạo tối đa 5 bản nháp mỗi lượt để kiểm soát chi phí AI. Mỗi bản nháp gắn với một nhóm; bạn cần tự xem lại và đăng thủ công.</div></section>' +
+      '<section class="panel"><h2>Chọn nhóm nhận bài</h2>' + groupList() + button('Mở tối đa 5 nhóm đã chọn', 'openSelectedGroups') + ' ' + button('Chọn tất cả', 'selectAll') + ' ' + button('Bỏ chọn', 'deselectAll') +
       '<h3>Thư viện bản nháp</h3>' + draftList(10) + '</section></div>';
   }
+
   function renderSchedule() {
     const tasks = state.tasks.slice().sort((a, b) => Date.parse(a.time) - Date.parse(b.time));
     const statusText = { scheduled: 'Đã lên lịch', due: 'Đến hạn', done: 'Đã hoàn thành', missed: 'Đã bỏ qua' };
@@ -197,8 +203,9 @@
     state.settings.model = model;
     return Gemini.generateContent({ apiKey, model, prompt });
   }
-  function addDraft(text, url, kind) {
+  function addDraft(text, url, kind, group) {
     const draft = { id: crypto.randomUUID(), text: String(text).slice(0, 20000), url: String(url || '').slice(0, 2048), createdAt: new Date().toISOString(), kind: kind || 'source' };
+    if (group) { draft.targetGroupId = group.id; draft.targetGroupName = group.name; draft.targetGroupUrl = group.url; }
     state.drafts.push(draft);
     if (state.drafts.length > 1000) state.drafts.shift();
     return draft;
@@ -258,6 +265,30 @@
         state.groups.forEach(group => { group.selected = false; });
         log('Đã bỏ chọn nhóm');
         break;
+      case 'openGroup': {
+        const group = state.groups.find(item => item.id === id);
+        if (!group || !Core.isSafeFacebookGroupUrl(group.url)) { toast('URL nhóm không hợp lệ'); return; }
+        await chrome.tabs.create({ url: group.url });
+        log('Đã mở nhóm trong tab mới: ' + group.name);
+        break;
+      }
+      case 'openDraftGroup': {
+        const draft = state.drafts.find(item => item.id === id);
+        if (!draft || !Core.isSafeFacebookGroupUrl(draft.targetGroupUrl)) { toast('Bản nháp chưa có URL nhóm hợp lệ'); return; }
+        await chrome.tabs.create({ url: draft.targetGroupUrl });
+        log('Đã mở nhóm đích của bản nháp: ' + (draft.targetGroupName || 'Nhóm'));
+        break;
+      }
+      case 'openSelectedGroups': {
+        const selected = state.groups.filter(group => group.selected && Core.isSafeFacebookGroupUrl(group.url));
+        if (!selected.length) { toast('Hãy chọn ít nhất một nhóm'); return; }
+        const batch = selected.slice(0, 5);
+        if (!window.confirm('Mở ' + batch.length + ' tab nhóm Facebook để bạn thao tác thủ công?')) return;
+        for (const group of batch) await chrome.tabs.create({ url: group.url, active: false });
+        log('Đã mở ' + batch.length + ' tab nhóm đã chọn');
+        toast('Đã mở ' + batch.length + ' tab nhóm');
+        break;
+      }
       case 'addProfile': {
         const nameValue = $('#profileName').value.trim();
         if (!nameValue || nameValue.length > 200) { toast('Nhập tên hồ sơ hợp lệ'); return; }
@@ -373,26 +404,38 @@
         const postText = $('#postText').value.trim();
         const postUrl = $('#postUrl').value.trim();
         if (!postText || postText.length > 20000) { toast('Nhập nội dung bài gốc hợp lệ'); return; }
-        if (postUrl && (!/^https:\/\/(www\.)?facebook\.com\//i.test(postUrl) || postUrl.length > 2048)) { toast('Link bài viết phải là HTTPS trên facebook.com'); return; }
-        state.prompts.share = $('#sharePrompt').value.slice(0, 20000);
-        const selected = state.groups.filter(group => group.selected);
-        const groupName = selected.length ? selected[0].name : 'nhóm phù hợp';
-        let prompt = Core.fillPrompt(state.prompts.share, { postText, groupName });
-        if (!state.prompts.share.includes('{postText}')) prompt += '\n\nNội dung bài gốc:\n' + postText;
-        if (!state.prompts.share.includes('{groupName}')) prompt += '\n\nNgữ cảnh nhóm: ' + groupName;
-        try {
-          const output = await geminiRequest(prompt);
-          if (!output) return;
-          addDraft(output, postUrl, 'share');
-          log('Đã tạo nháp lời dẫn bằng Gemini');
-          break;
-        } catch (error) {
-          log('Gemini lỗi khi tạo lời dẫn: ' + error.message);
-          await save();
-          toast(error.message);
-          return;
+        if (postUrl && (!/^https:\/\/(www\.)?facebook\.com\//i.test(postUrl) || postUrl.length > 2048)) {
+          toast('Link bài viết phải là HTTPS trên facebook.com'); return;
         }
+        state.prompts.share = $('#sharePrompt').value.slice(0, 20000);
+        const selected = state.groups.filter(group => group.selected && Core.isSafeFacebookGroupUrl(group.url));
+        const targets = selected.length ? selected.slice(0, 5) : [{ id: '', name: 'Chưa chọn nhóm', url: '' }];
+        if (selected.length > 5 && !window.confirm('Đã chọn ' + selected.length + ' nhóm. Tạo nháp cho 5 nhóm đầu tiên trong lượt này?')) return;
+        if (!window.confirm('Gửi nội dung đầu vào tới Gemini để tạo ' + targets.length + ' bản nháp? Không có nội dung nào được đăng tự động.')) return;
+        let created = 0;
+        for (const group of targets) {
+          let prompt = Core.fillPrompt(state.prompts.share, { postText, groupName: group.name });
+          if (!state.prompts.share.includes('{postText}')) prompt += '\n\nNội dung bài gốc:\n' + postText;
+          if (!state.prompts.share.includes('{groupName}')) prompt += '\n\nNgữ cảnh nhóm: ' + group.name;
+          try {
+            const output = await geminiRequest(prompt);
+            if (!output) break;
+            addDraft(output, postUrl, 'share', group.url ? group : null);
+            created += 1;
+            log('Đã tạo nháp lời dẫn' + (group.url ? ' cho nhóm ' + group.name : ''));
+            await save();
+          } catch (error) {
+            log('Gemini lỗi khi tạo lời dẫn: ' + error.message);
+            await save();
+            toast('Đã tạo ' + created + ' nháp trước khi gặp lỗi: ' + error.message);
+            render();
+            return;
+          }
+        }
+        if (created) toast('Đã tạo ' + created + ' bản nháp. Hãy kiểm tra trước khi đăng.');
+        break;
       }
+
       case 'saveAiDraft': {
         const input = $('#aiInput').value.trim();
         if (!input || input.length > 20000) { toast('Nhập nội dung đầu vào hợp lệ'); return; }

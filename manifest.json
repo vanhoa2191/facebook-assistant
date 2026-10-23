@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "Facebook AI Assistant",
-  "version": "0.3.0",
-  "description": "Trợ lý AI Facebook: quản lý nhóm, bản nháp, Gemini và lịch nhắc việc.",
+  "version": "0.4.0",
+  "description": "Trợ lý AI Facebook: quản lý nhóm, bản nháp, Gemini, Page Graph API và lịch nhắc việc.",
   "permissions": [
     "storage",
     "alarms"
@@ -15,6 +15,7 @@
   },
   "options_page": "dashboard.html",
   "optional_host_permissions": [
-    "https://generativelanguage.googleapis.com/*"
+    "https://generativelanguage.googleapis.com/*",
+    "https://graph.facebook.com/*"
   ]
 }

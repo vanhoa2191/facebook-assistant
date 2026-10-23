@@ -458,7 +458,7 @@
           if (!state.prompts.share.includes('{groupName}')) prompt += '\n\nNgữ cảnh nhóm: ' + group.name;
           try {
             const output = await geminiRequest(prompt);
-            if (!output) break;
+            if (!output) return;
             addDraft(output, postUrl, 'share', group.url ? group : null);
             created += 1;
             log('Đã tạo nháp lời dẫn' + (group.url ? ' cho nhóm ' + group.name : ''));

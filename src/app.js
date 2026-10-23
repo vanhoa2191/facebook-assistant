@@ -63,6 +63,7 @@
       (draft.targetGroupName ? '<div class="draft-target">Nhóm đích: ' + esc(draft.targetGroupName) + '</div>' : '') +
       '<p class="draft-text">' + esc(draft.text.slice(0, 700)) + (draft.text.length > 700 ? '…' : '') + '</p>' +
       '<div class="btnrow">' + button('Sao chép', 'copyDraft', '', draft.id) + button('Sửa', 'editDraft', '', draft.id) +
+      (draft.url && Core.isSafeFacebookUrl(draft.url) ? button('Mở bài gốc', 'openDraftSource', '', draft.id) : '') +
       (draft.targetGroupUrl ? button('Mở nhóm', 'openDraftGroup', '', draft.id) : '') +
       button('Xóa', 'deleteDraft', 'warn', draft.id) + '</div></article>'
     ).join('') + '</div>';
@@ -227,7 +228,8 @@
           (draft.targetGroupName ? '<div class="draft-target">Nhóm đích: ' + esc(draft.targetGroupName) + '</div>' : '') +
           '<p class="draft-text">' + esc(draft.text.slice(0, 700)) + (draft.text.length > 700 ? '…' : '') + '</p>' +
           '<div class="btnrow">' + button('Sao chép', 'copyDraft', '', draft.id) + button('Sửa', 'editDraft', '', draft.id) +
-          (draft.targetGroupUrl ? button('Mở nhóm', 'openDraftGroup', '', draft.id) : '') +
+          (draft.url && Core.isSafeFacebookUrl(draft.url) ? button('Mở bài gốc', 'openDraftSource', '', draft.id) : '') +
+      (draft.targetGroupUrl ? button('Mở nhóm', 'openDraftGroup', '', draft.id) : '') +
           button('Xóa', 'deleteDraft', 'warn', draft.id) + '</div></article>'
         ).join('') + '</div>'
       : '<div class="placeholder">Không tìm thấy bản nháp phù hợp.</div>';
@@ -508,6 +510,13 @@
         if (!group || !Core.isSafeFacebookGroupUrl(group.url)) { toast('URL nhóm không hợp lệ'); return; }
         await chrome.tabs.create({ url: group.url });
         log('Đã mở nhóm trong tab mới: ' + group.name);
+        break;
+      }
+      case 'openDraftSource': {
+        const draft = state.drafts.find(item => item.id === id);
+        if (!draft || !Core.isSafeFacebookUrl(draft.url)) { toast('Bản nháp chưa có URL bài gốc hợp lệ.'); return; }
+        await chrome.tabs.create({ url: draft.url });
+        log('Đã mở bài gốc của bản nháp');
         break;
       }
       case 'openDraftGroup': {

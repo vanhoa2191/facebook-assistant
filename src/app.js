@@ -593,9 +593,15 @@
     toast('Đã lưu trên trình duyệt');
   }
   function init() {
-    chrome.storage.local.get('faa.state').then(result => {
+    chrome.storage.local.get('faa.state').then(async result => {
       const stored = result['faa.state'];
-      if (Core.isValidState(stored)) state = stored;
+      const migrated = stored ? Core.migrateState(stored) : null;
+      if (Core.isValidState(migrated)) {
+        state = migrated;
+        if (JSON.stringify(migrated) !== JSON.stringify(stored)) await save();
+      } else if (stored) {
+        toast('Dữ liệu đã lưu không hợp lệ; đang dùng trạng thái mặc định.');
+      }
       await refreshAiStatus();
       render();
     }).catch(() => {
@@ -622,7 +628,7 @@
       if (!file) return;
       if (file.size > 5000000) { toast('File quá lớn'); event.target.value = ''; return; }
       try {
-        const imported = JSON.parse(await file.text());
+        const imported = Core.migrateState(JSON.parse(await file.text()));
         if (!Core.isValidState(imported)) throw new Error('Invalid state');
         if (!window.confirm('Nhập cấu hình sẽ thay thế dữ liệu hiện tại. Tiếp tục?')) return;
         state = imported;

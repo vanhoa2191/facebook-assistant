@@ -103,6 +103,7 @@
     return '<div class="grid four">' +
       '<section class="panel"><h2>Quản lý nhóm</h2><p>Danh sách nhóm do bạn nhập thủ công</p><div class="metric"><div><small>Tổng nhóm</small>' + state.groups.length + '</div><div><small>Đã chọn</small>' + state.groups.filter(g => g.selected).length + '</div></div>' +
       groupList() + '<div class="btnrow">' + button('Mở tối đa 5 nhóm đã chọn', 'openSelectedGroups') + button('Chọn tất cả', 'selectAll') + button('Bỏ chọn', 'deselectAll') + '</div>' +
+      '<div class="btnrow">' + button('Nhập CSV', 'importGroups') + button('Xuất CSV', 'exportGroups') + '</div>' +
       field('Số nhóm mỗi đợt (cấu hình)', 'groupLimit', state.settings.groupLimit, 'number') + field('Khoảng cách (giây)', 'delay', state.settings.delay, 'number') +
       '<div class="banner">Chỉ mở tab nhóm để bạn tự xem và thao tác. Extension không tự đăng, bình luận hoặc gửi lời mời.</div>' + button('Lưu cấu hình', 'saveSettings', 'primary full') + '</section>' +
       '<section class="panel"><h2>Like / Cảm xúc</h2><p>Phân hệ tham khảo · chưa kích hoạt</p><div class="metric"><div><small>Đã thực hiện</small>0</div><div><small>Đã chọn</small>' + state.groups.filter(g => g.selected).length + '</div></div><div class="placeholder">Tương tác tự động chưa được triển khai.</div></section>' +
@@ -265,6 +266,17 @@
         state.groups.forEach(group => { group.selected = false; });
         log('Đã bỏ chọn nhóm');
         break;
+      case 'importGroups':
+        $('#groupImportFile').click();
+        return;
+      case 'exportGroups': {
+        const rows = [['name', 'url', 'selected']].concat(state.groups.map(group => [group.name, group.url, group.selected ? 'true' : 'false']));
+        download('facebook-groups.csv', '\ufeff' + Core.toCsv(rows), 'text/csv;charset=utf-8');
+        log('Đã xuất danh sách ' + state.groups.length + ' nhóm ra CSV');
+        await save();
+        toast('Đã xuất danh sách nhóm');
+        return;
+      }
       case 'openGroup': {
         const group = state.groups.find(item => item.id === id);
         if (!group || !Core.isSafeFacebookGroupUrl(group.url)) { toast('URL nhóm không hợp lệ'); return; }
@@ -582,6 +594,45 @@
         toast('Đã nhập cấu hình');
       } catch (_) {
         toast('Không thể nhập file JSON này');
+      } finally {
+        event.target.value = '';
+      }
+    });
+    $('#groupImportFile').addEventListener('change', async event => {
+      const file = event.target.files && event.target.files[0];
+      if (!file) return;
+      if (file.size > 5000000) { toast('File CSV vượt quá 5 MB'); event.target.value = ''; return; }
+      try {
+        const rows = Core.parseCsv((await file.text()).replace(/^\uFEFF/, ''));
+        if (!rows.length) throw new Error('CSV trống');
+        const first = rows[0].map(value => value.trim().toLowerCase());
+        const nameHeaders = ['name', 'group', 'group name', 'tên nhóm', 'ten nhom'];
+        const urlHeaders = ['url', 'link', 'group url', 'đường dẫn', 'duong dan'];
+        const nameIndex = first.findIndex(value => nameHeaders.includes(value));
+        const urlIndex = first.findIndex(value => urlHeaders.includes(value));
+        const hasHeader = nameIndex >= 0 && urlIndex >= 0;
+        const start = hasHeader ? 1 : 0;
+        const ni = hasHeader ? nameIndex : 0;
+        const ui = hasHeader ? urlIndex : 1;
+        let added = 0;
+        let skipped = 0;
+        for (const row of rows.slice(start)) {
+          const nameValue = String(row[ni] || '').trim();
+          const urlValue = String(row[ui] || '').trim();
+          if (!nameValue && !urlValue) continue;
+          if (!nameValue || nameValue.length > 200 || !Core.isSafeFacebookGroupUrl(urlValue) ||
+              state.groups.some(group => group.url === urlValue) ||
+              state.groups.length >= 10000) { skipped += 1; continue; }
+          state.groups.push({ id: crypto.randomUUID(), name: nameValue, url: urlValue, selected: false });
+          added += 1;
+        }
+        if (!added && skipped) throw new Error('Không có dòng hợp lệ. Kiểm tra cột tên nhóm và URL Facebook.');
+        log('Nhập CSV nhóm: thêm ' + added + ', bỏ qua ' + skipped + ' dòng');
+        await save();
+        render();
+        toast('Đã thêm ' + added + ' nhóm; bỏ qua ' + skipped + ' dòng không hợp lệ hoặc trùng.');
+      } catch (error) {
+        toast(error.message === 'CSV trống' ? error.message : 'Không thể nhập CSV: ' + error.message);
       } finally {
         event.target.value = '';
       }

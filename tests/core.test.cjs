@@ -148,3 +148,15 @@ test('reminders can reference an existing or future draft identifier', () => {
   state.tasks[0].draftId = 'x'.repeat(101);
   assert.equal(Core.isValidState(state), false);
 });
+
+
+test('local Meta Page schedule records require valid Page IDs and timestamps', () => {
+  const state = Core.createDefaultState();
+  state.pageSchedules.push({
+    id: 'schedule-1', pageId: '12345678', message: 'Scheduled post', link: '',
+    scheduledAt: '2026-10-25T10:00:00.000Z', createdAt: '2026-10-24T10:00:00.000Z', status: 'scheduled'
+  });
+  assert.equal(Core.isValidState(state), true);
+  state.pageSchedules[0].pageId = 'not-a-page';
+  assert.equal(Core.isValidState(state), false);
+});

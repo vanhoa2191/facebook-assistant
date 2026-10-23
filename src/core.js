@@ -98,9 +98,9 @@
   function toCsv(rows) {
     return rows.map(row => row.map(value => {
       let text = String(value == null ? '' : value);
-      if (/^[=+\\-@\\t\\r]/.test(text)) text = "'" + text;
+      if (/^[=+\-@\t\r]/.test(text)) text = "'" + text;
       return '"' + text.replace(/"/g, '""') + '"';
-    }).join(',')).join('\\r\\n');
+    }).join(',')).join('\r\n');
   }
 
   return { createDefaultState, escapeHtml, isSafeFacebookGroupUrl, isValidState, fillPrompt, toCsv };

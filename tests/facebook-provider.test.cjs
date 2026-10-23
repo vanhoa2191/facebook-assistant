@@ -1,0 +1,69 @@
+'use strict';
+
+const test = require('node:test');
+const assert = require('node:assert/strict');
+const Facebook = require('../src/facebook-provider.js');
+
+test('rejects invalid Page ID, token, message, version, and link before calling API', async () => {
+  let calls = 0;
+  const fetchImpl = async () => { calls += 1; return { ok: true, json: async () => ({ id: '123_456' }) }; };
+  const base = { pageId: '12345678', accessToken: 'test-page-token-12345', message: 'Hello Page', fetchImpl };
+  await assert.rejects(Facebook.publishPagePost({ ...base, pageId: 'not-a-number' }), /Page ID/);
+  await assert.rejects(Facebook.publishPagePost({ ...base, accessToken: 'short' }), /token/);
+  await assert.rejects(Facebook.publishPagePost({ ...base, message: ' ' }), /Nội dung/);
+  await assert.rejects(Facebook.publishPagePost({ ...base, version: 'latest' }), /phiên bản/);
+  await assert.rejects(Facebook.publishPagePost({ ...base, link: 'javascript:alert(1)' }), /HTTPS/);
+  assert.equal(calls, 0);
+});
+
+test('publishes a Page post using a POST body and never puts the token in the URL', async () => {
+  let request;
+  const fetchImpl = async (url, options) => {
+    request = { url, options };
+    return { ok: true, status: 200, json: async () => ({ id: '12345678_98765432' }) };
+  };
+  const result = await Facebook.publishPagePost({
+    pageId: '12345678',
+    accessToken: 'test-page-token-12345',
+    message: 'A reviewed Page post',
+    link: 'https://example.com/news',
+    version: 'v26.0',
+    fetchImpl
+  });
+  assert.deepEqual(result, { id: '12345678_98765432', pageId: '12345678', version: 'v26.0' });
+  assert.equal(request.options.method, 'POST');
+  assert.match(request.url, /v26\.0\/12345678\/feed$/);
+  assert.equal(request.url.includes('test-page-token-12345'), false);
+  const body = new URLSearchParams(request.options.body);
+  assert.equal(body.get('access_token'), 'test-page-token-12345');
+  assert.equal(body.get('message'), 'A reviewed Page post');
+  assert.equal(body.get('link'), 'https://example.com/news');
+});
+
+test('normalizes permission and rate-limit failures', async () => {
+  const forbidden = async () => ({ ok: false, status: 403, json: async () => ({ error: { code: 200, message: 'permission denied' } }) });
+  await assert.rejects(Facebook.publishPagePost({
+    pageId: '12345678', accessToken: 'test-page-token-12345', message: 'hello', fetchImpl: forbidden
+  }), /pages_manage_posts/);
+  const rateLimit = async () => ({ ok: false, status: 400, json: async () => ({ error: { code: 613, message: 'limit' } }) });
+  await assert.rejects(Facebook.publishPagePost({
+    pageId: '12345678', accessToken: 'test-page-token-12345', message: 'hello', fetchImpl: rateLimit
+  }), /giới hạn/);
+});
+
+test('handles network failure, timeout, and responses without post IDs', async () => {
+  const network = async () => { throw new Error('internal token details'); };
+  await assert.rejects(Facebook.publishPagePost({
+    pageId: '12345678', accessToken: 'test-page-token-12345', message: 'hello', fetchImpl: network
+  }), /Không thể kết nối/);
+  const empty = async () => ({ ok: true, status: 200, json: async () => ({}) });
+  await assert.rejects(Facebook.publishPagePost({
+    pageId: '12345678', accessToken: 'test-page-token-12345', message: 'hello', fetchImpl: empty
+  }), /không trả về ID/);
+  const slow = (_url, options) => new Promise((resolve, reject) => {
+    options.signal.addEventListener('abort', () => reject(new Error('aborted')), { once: true });
+  });
+  await assert.rejects(Facebook.publishPagePost({
+    pageId: '12345678', accessToken: 'test-page-token-12345', message: 'hello', fetchImpl: slow, timeoutMs: 1000
+  }), /hết thời gian chờ/);
+});

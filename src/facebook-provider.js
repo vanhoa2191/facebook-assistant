@@ -16,6 +16,7 @@
     const accessToken = typeof settings.accessToken === 'string' ? settings.accessToken.trim() : '';
     const message = typeof settings.message === 'string' ? settings.message.trim() : '';
     const link = typeof settings.link === 'string' ? settings.link.trim() : '';
+    const scheduledValue = settings.scheduledPublishAt == null ? '' : settings.scheduledPublishAt;
     const version = typeof settings.version === 'string' ? settings.version.trim() : DEFAULT_VERSION;
     const fetchImpl = settings.fetchImpl || (typeof fetch === 'function' ? fetch.bind(globalThis) : null);
     const timeoutMs = Number.isFinite(settings.timeoutMs) ? Math.min(120000, Math.max(1000, settings.timeoutMs)) : 45000;
@@ -29,9 +30,24 @@
 
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), timeoutMs);
+    let scheduledAt = null;
+    if (scheduledValue) {
+      const parsed = new Date(scheduledValue);
+      const timestamp = parsed.getTime();
+      const now = Date.now();
+      if (!Number.isFinite(timestamp)) throw new Error('Thời điểm đăng bài không hợp lệ.');
+      if (timestamp < now + 10 * 60 * 1000) throw new Error('Bài đăng cần được lên lịch ít nhất 10 phút trong tương lai.');
+      if (timestamp > now + 30 * 24 * 60 * 60 * 1000) throw new Error('Bản hiện tại chỉ cho phép lên lịch tối đa 30 ngày.');
+      scheduledAt = Math.floor(timestamp / 1000);
+    }
+
     const endpoint = API_ORIGIN + '/' + version + '/' + encodeURIComponent(pageId) + '/feed';
     const body = new URLSearchParams({ message, access_token: accessToken });
     if (link) body.set('link', link);
+    if (scheduledAt) {
+      body.set('published', 'false');
+      body.set('scheduled_publish_time', String(scheduledAt));
+    }
 
     let response;
     try {
@@ -67,7 +83,7 @@
     if (!data || typeof data.id !== 'string' || !data.id) {
       throw new Error('Facebook không trả về ID bài viết; hãy kiểm tra kết quả trong Page.');
     }
-    return { id: data.id, pageId, version };
+    return { id: data.id, pageId, version, scheduled: Boolean(scheduledAt), scheduledAt: scheduledAt ? new Date(scheduledAt * 1000).toISOString() : null };
   }
 
   return { publishPagePost, API_ORIGIN, DEFAULT_VERSION, MAX_MESSAGE_LENGTH };

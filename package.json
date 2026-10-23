@@ -1,0 +1,15 @@
+{
+  "name": "facebook-ai-assistant",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Manifest V3 dashboard for locally managed AI-assisted Facebook workflows",
+  "scripts": {
+    "test": "node --test",
+    "validate": "node scripts/validate-extension.cjs",
+    "package": "node scripts/package-extension.cjs",
+    "check": "npm test && npm run validate && npm run package"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

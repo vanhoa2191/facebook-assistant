@@ -1,0 +1,93 @@
+(function (root, factory) {
+  'use strict';
+  const api = factory();
+  if (typeof module === 'object' && module.exports) module.exports = api;
+  if (root) root.FAACore = api;
+})(typeof globalThis !== 'undefined' ? globalThis : this, function () {
+  'use strict';
+
+  const MAX_ITEMS = 10000;
+  const isObject = value => value !== null && typeof value === 'object' && !Array.isArray(value);
+  const isText = (value, max) => typeof value === 'string' && value.length <= max;
+
+  function createDefaultState() {
+    return {
+      settings: { language: 'vi', speed: 'normal', provider: 'demo', model: '', groupLimit: 10, delay: 30 },
+      groups: [],
+      profiles: [],
+      tasks: [],
+      logs: [],
+      drafts: [],
+      moduleNotes: {},
+      prompts: {
+        share: 'Viết lời dẫn ngắn, tự nhiên, phù hợp với {groupName}, dựa trên nội dung: {postText}. Không thêm thông tin chưa được xác minh.'
+      }
+    };
+  }
+
+  function escapeHtml(value) {
+    return String(value == null ? '' : value).replace(/[&<>"']/g, function (character) {
+      return ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[character];
+    });
+  }
+
+  function isSafeFacebookGroupUrl(value) {
+    if (typeof value !== 'string' || value.length > 2048) return false;
+    try {
+      const url = new URL(value);
+      const host = url.hostname.toLowerCase();
+      const facebookHost = host === 'facebook.com' || host.endsWith('.facebook.com');
+      return url.protocol === 'https:' && facebookHost && !url.username && !url.password &&
+        /^\/groups\/[^/]+(?:\/|$)/i.test(url.pathname);
+    } catch (_) {
+      return false;
+    }
+  }
+
+  function isBoundedArray(value) {
+    return Array.isArray(value) && value.length <= MAX_ITEMS;
+  }
+
+  function isValidState(value) {
+    if (!isObject(value) || !isObject(value.settings) || !isObject(value.prompts)) return false;
+    const arrayKeys = ['groups', 'profiles', 'tasks', 'logs', 'drafts'];
+    if (!arrayKeys.every(key => isBoundedArray(value[key]))) return false;
+    if (!isObject(value.moduleNotes) && value.moduleNotes !== undefined) return false;
+
+    const settings = value.settings;
+    if (settings.language !== 'vi' || !isText(settings.provider, 40) ||
+        !isText(settings.model, 120) || !Number.isFinite(settings.groupLimit) ||
+        settings.groupLimit < 1 || settings.groupLimit > 10000 ||
+        !Number.isFinite(settings.delay) || settings.delay < 0 || settings.delay > 86400) return false;
+    if (!isText(value.prompts.share, 20000)) return false;
+
+    if (!value.groups.every(group => isObject(group) &&
+      isText(group.id, 100) && group.id.length > 0 &&
+      isText(group.name, 200) && group.name.trim().length > 0 &&
+      isSafeFacebookGroupUrl(group.url) && typeof group.selected === 'boolean')) return false;
+
+    if (!value.profiles.every(profile => isObject(profile) &&
+      isText(profile.id, 100) && isText(profile.name, 200) &&
+      isText(profile.provider, 40))) return false;
+    if (!value.tasks.every(task => isObject(task) &&
+      isText(task.id, 100) && isText(task.name, 200) &&
+      isText(task.time, 100))) return false;
+    if (!value.logs.every(log => isObject(log) &&
+      isText(log.at, 100) && isText(log.message, 2000))) return false;
+    if (!value.drafts.every(draft => isObject(draft) &&
+      isText(draft.id, 100) && isText(draft.text, 20000) &&
+      isText(draft.url, 2048) && isText(draft.createdAt, 100))) return false;
+    if (value.moduleNotes && !Object.entries(value.moduleNotes).every(entry =>
+      isText(entry[0], 80) && isText(entry[1], 2000))) return false;
+    return true;
+  }
+
+  function toCsv(rows) {
+    return rows.map(row => row.map(value => {
+      const text = String(value == null ? '' : value);
+      return '"' + text.replace(/"/g, '""') + '"';
+    }).join(',')).join('\r\n');
+  }
+
+  return { createDefaultState, escapeHtml, isSafeFacebookGroupUrl, isValidState, toCsv };
+});

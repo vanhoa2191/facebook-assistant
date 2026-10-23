@@ -12,7 +12,7 @@
 
   function createDefaultState() {
     return {
-      settings: { language: 'vi', speed: 'normal', provider: 'demo', model: '', groupLimit: 10, delay: 30 },
+      settings: { language: 'vi', speed: 'normal', provider: 'demo', model: '', groupLimit: 10, delay: 30, pageId: '', graphVersion: 'v26.0' },
       groups: [],
       profiles: [],
       tasks: [],
@@ -80,7 +80,9 @@
     if (settings.language !== 'vi' || !['demo', 'gemini', 'meta'].includes(settings.provider) ||
         !isText(settings.model, 120) || !Number.isFinite(settings.groupLimit) ||
         settings.groupLimit < 1 || settings.groupLimit > 10000 ||
-        !Number.isFinite(settings.delay) || settings.delay < 0 || settings.delay > 86400) return false;
+        !Number.isFinite(settings.delay) || settings.delay < 0 || settings.delay > 86400 ||
+        (settings.pageId !== undefined && settings.pageId !== '' && !/^[0-9]{5,30}$/.test(settings.pageId)) ||
+        (settings.graphVersion !== undefined && !/^v[0-9]{1,2}\.0$/.test(settings.graphVersion))) return false;
     if (!isText(value.prompts.share, 20000)) return false;
 
     if (!value.groups.every(group => isObject(group) &&

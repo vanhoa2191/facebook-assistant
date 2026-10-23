@@ -60,7 +60,7 @@
     if (!isObject(value.moduleNotes) && value.moduleNotes !== undefined) return false;
 
     const settings = value.settings;
-    if (settings.language !== 'vi' || !isText(settings.provider, 40) ||
+    if (settings.language !== 'vi' || !['demo', 'gemini', 'meta'].includes(settings.provider) ||
         !isText(settings.model, 120) || !Number.isFinite(settings.groupLimit) ||
         settings.groupLimit < 1 || settings.groupLimit > 10000 ||
         !Number.isFinite(settings.delay) || settings.delay < 0 || settings.delay > 86400) return false;
@@ -73,10 +73,13 @@
 
     if (!value.profiles.every(profile => isObject(profile) &&
       isText(profile.id, 100) && isText(profile.name, 200) &&
-      isText(profile.provider, 40))) return false;
+      ['demo', 'gemini', 'meta'].includes(profile.provider) &&
+      (profile.model === undefined || isText(profile.model, 120)) &&
+      (profile.prompt === undefined || isText(profile.prompt, 20000)))) return false;
     if (!value.tasks.every(task => isObject(task) &&
       isText(task.id, 100) && isText(task.name, 200) &&
-      isText(task.time, 100))) return false;
+      isText(task.time, 100) &&
+      (task.status === undefined || ['scheduled', 'due', 'done', 'missed'].includes(task.status)))) return false;
     if (!value.logs.every(log => isObject(log) &&
       isText(log.at, 100) && isText(log.message, 2000))) return false;
     if (!value.drafts.every(draft => isObject(draft) &&

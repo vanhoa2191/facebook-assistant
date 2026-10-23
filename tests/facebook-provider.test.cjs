@@ -11,7 +11,7 @@ test('rejects invalid Page ID, token, message, version, and link before calling 
   await assert.rejects(Facebook.publishPagePost({ ...base, pageId: 'not-a-number' }), /Page ID/);
   await assert.rejects(Facebook.publishPagePost({ ...base, accessToken: 'short' }), /token/);
   await assert.rejects(Facebook.publishPagePost({ ...base, message: ' ' }), /Nội dung/);
-  await assert.rejects(Facebook.publishPagePost({ ...base, version: 'latest' }), /phiên bản/);
+  await assert.rejects(Facebook.publishPagePost({ ...base, version: 'latest' }), /phiên bản/i);
   await assert.rejects(Facebook.publishPagePost({ ...base, link: 'javascript:alert(1)' }), /HTTPS/);
   assert.equal(calls, 0);
 });

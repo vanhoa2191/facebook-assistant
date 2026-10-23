@@ -98,7 +98,8 @@
     if (!value.tasks.every(task => isObject(task) &&
       isText(task.id, 100) && isText(task.name, 200) &&
       isText(task.time, 100) &&
-      (task.status === undefined || ['scheduled', 'due', 'done', 'missed'].includes(task.status)))) return false;
+      (task.status === undefined || ['scheduled', 'due', 'done', 'missed'].includes(task.status)) &&
+      (task.draftId === undefined || isText(task.draftId, 100)))) return false;
     if (!value.logs.every(log => isObject(log) &&
       isText(log.at, 100) && isText(log.message, 2000))) return false;
     if (!value.drafts.every(draft => isObject(draft) &&

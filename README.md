@@ -2,14 +2,14 @@
 
 Chrome Extension Manifest V3 with a Vietnamese dashboard for managing Facebook content workflows and AI-assisted drafts.
 
-## Phase 1–4 scope
+## Phase 1–5 scope
 
 - Twelve navigation modules aligned with the reference screenshots.
 - Local group list management, selection, and safe URL validation.
 - Gemini API adapter with optional host permission, timeout, and session-only API key storage.
 - Manual Meta AI workflow: copy a prompt to another AI tool and save its result as a draft.
 - Group CSV import/export, per-group share drafts, manual group opening, and a searchable draft library.
-- Optional Facebook Pages Graph API publishing using a Page access token, explicit host permission, and a confirmation before publishing.
+- Optional Facebook Pages Graph API publishing and native Meta scheduling, using a Page access token, explicit host permission, and confirmation before public actions.
 - AI-generated content and share copy are saved as drafts for review.
 - Share-post drafts, Chrome Alarms reminders, activity log, and JSON/CSV export.
 - Strict local import validation and escaping of user-provided values.
@@ -38,9 +38,11 @@ The key is stored in chrome.storage.session, not in exported JSON or the activit
 2. Obtain a Page access token from your Meta app with the required `pages_manage_posts` permission and access to that Page.
 3. Click Cấp quyền Graph API and approve the optional Chrome host permission.
 4. Paste the token and click Lưu token trong phiên. The token is stored in `chrome.storage.session`, not in exports or logs.
-5. Enter the post text and optional HTTPS link, then click Đăng bài lên Page and confirm the public action.
+5. Enter the post text and optional HTTPS link. Leave the publish-time field empty to publish immediately, or choose a future time and confirm the action.
 
-The extension calls the versioned Page feed endpoint. Meta may require app setup, business verification, permission review, or other eligibility checks. A CI test uses a mocked API response; live publishing has not been tested without your own Meta app, Page ID, and token.
+Scheduled posts must be at least 10 minutes and no more than 30 days ahead in this version. The extension sends the scheduled post to Meta using `published=false` and `scheduled_publish_time`. After Meta confirms, the returned post ID and schedule are saved locally and shown in Lịch chạy. Use Mở Planner to review the schedule in Meta Business Suite. The extension does not poll Meta for later publication status.
+
+The extension calls the versioned Page feed endpoint. Meta may require app setup, business verification, permission review, or other eligibility checks. CI tests use mocked API responses; live publishing and scheduling have not been tested without your own Meta app, Page ID, and token.
 
 ## Current limitations
 

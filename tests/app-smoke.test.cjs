@@ -62,6 +62,8 @@ test('dashboard initializes and renders all 12 navigation modules', async () => 
   assert.equal((sidebar.match(/data-nav=/g) || []).length, 12);
   assert.equal(elements['#pageTitle'].textContent, 'Quản lý nhóm và tương tác');
   assert.match(elements['#view'].innerHTML, /Thêm nhóm/);
+  assert.match(elements['#view'].innerHTML, /Theo dõi tương tác/);
+  assert.match(elements['#view'].innerHTML, /addEngagement/);
 });
 
 test('navigation opens the AI and sales modules without runtime errors', async () => {

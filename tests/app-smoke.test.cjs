@@ -79,4 +79,23 @@ test('navigation opens the AI and sales modules without runtime errors', async (
   } } });
   assert.equal(elements['#pageTitle'].textContent, 'Đăng bán');
   assert.match(elements['#view'].innerHTML, /Thông tin sản phẩm/);
+
+  click({ target: { closest(selector) {
+    return selector === '[data-nav]' ? { dataset: { nav: 'pages' } } : null;
+  } } });
+  assert.equal(elements['#pageTitle'].textContent, 'Nuôi Page');
+  assert.match(elements['#view'].innerHTML, /Page access token/);
+  assert.match(elements['#view'].innerHTML, /Đăng bài lên Page/);
+
+  click({ target: { closest(selector) {
+    return selector === '[data-nav]' ? { dataset: { nav: 'share' } } : null;
+  } } });
+  assert.match(elements['#view'].innerHTML, /shareExternalOutput/);
+  assert.match(elements['#view'].innerHTML, /Sao chép prompt/);
+
+  click({ target: { closest(selector) {
+    return selector === '[data-nav]' ? { dataset: { nav: 'learn' } } : null;
+  } } });
+  assert.match(elements['#view'].innerHTML, /moduleOutput/);
+  assert.match(elements['#view'].innerHTML, /Lưu kết quả AI thành nháp/);
 });

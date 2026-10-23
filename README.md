@@ -2,7 +2,7 @@
 
 Chrome Extension Manifest V3 with a Vietnamese dashboard for managing Facebook content workflows and AI-assisted drafts.
 
-## Phase 1 scope
+## Phase 1–2 scope
 
 - Twelve navigation modules aligned with the reference screenshots.
 - Local group list management, selection, and safe URL validation.
@@ -19,9 +19,19 @@ Chrome Extension Manifest V3 with a Vietnamese dashboard for managing Facebook c
 3. Enable Developer mode.
 4. Select Load unpacked and choose the directory containing manifest.json.
 
+## Configure Gemini
+
+1. Open the AI chung module and select Gemini API.
+2. Click Cấp quyền Gemini API and accept Chrome's permission prompt.
+3. Paste your Gemini API key and click Lưu khóa trong phiên.
+4. Use Kiểm tra kết nối, then enter a prompt and source text to generate a draft.
+5. Review the draft before copying it into another workflow.
+
+The key is stored in chrome.storage.session, not in exported JSON or the activity log, and is normally cleared when the Chrome session ends. It remains usable by the extension while the current session is active. Prompts and source text are sent to Google when you run a Gemini request. Do not send confidential or personal data unless you are authorized to do so.
+
 ## Current limitations
 
-Facebook login, scraping, posting, sharing, comments, friend requests, and group joining are not implemented. Gemini API can be used after the user explicitly grants optional host permission and stores a key for the current browser session. Meta AI remains a placeholder. No Facebook host permissions or cookies access are requested.
+Facebook login, scraping, posting, sharing, comments, friend requests, and group joining are not implemented. The scrape and learning modules work with text that you paste in; they do not collect data from Facebook. Gemini API access is optional. Meta AI remains a placeholder because this extension does not implement an official Meta AI API adapter. No permanent Facebook host permissions or cookies access are requested.
 
 ## Development
 
@@ -29,4 +39,4 @@ Requires Node.js 20 or newer. Run npm test, npm run validate, and npm run packag
 
 ## Data and privacy
 
-Application data is stored locally using chrome.storage.local. Exported JSON may contain group names and URLs, prompts, drafts, and reminders; review it before sharing.
+Application data is stored locally using chrome.storage.local. Exported JSON may contain group names and URLs, prompts, drafts, and reminders; review it before sharing. Gemini API keys are deliberately excluded from exports.

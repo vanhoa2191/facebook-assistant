@@ -101,3 +101,22 @@ test('group-targeted drafts accept valid Facebook URLs and reject unsafe targets
   });
   assert.equal(Core.isValidState(unsafe), false);
 });
+
+
+test('CSV parser handles quoted commas, quotes, CRLF, and embedded newlines', () => {
+  const csv = '"name","url","selected"\r\n"Group, A","https://www.facebook.com/groups/a","true"\r\n"Group ""B""","https://www.facebook.com/groups/b","false"';
+  assert.deepEqual(Core.parseCsv(csv), [
+    ['name', 'url', 'selected'],
+    ['Group, A', 'https://www.facebook.com/groups/a', 'true'],
+    ['Group "B"', 'https://www.facebook.com/groups/b', 'false']
+  ]);
+  assert.deepEqual(Core.parseCsv('"name","notes"\n"A","line one\nline two"'), [
+    ['name', 'notes'], ['A', 'line one\nline two']
+  ]);
+});
+
+test('CSV parser rejects malformed quoting and oversized input', () => {
+  assert.throws(() => Core.parseCsv('"not closed'), /chưa đóng/);
+  assert.throws(() => Core.parseCsv('a"b,c'), /không đúng vị trí/);
+  assert.throws(() => Core.parseCsv('x'.repeat(5000001)), /5 MB/);
+});

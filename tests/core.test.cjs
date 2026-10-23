@@ -139,3 +139,12 @@ test('CSV parser rejects characters after a closing quote', () => {
   assert.equal(Core.isSafeFacebookGroupUrl('https://evil.facebook.com/groups/example'), false);
   assert.equal(Core.isSafeFacebookGroupUrl('https://facebook.com:444/groups/example'), false);
 });
+
+
+test('reminders can reference an existing or future draft identifier', () => {
+  const state = Core.createDefaultState();
+  state.tasks.push({ id: 't-linked', name: 'Review post', time: '2026-10-24T09:00', status: 'scheduled', draftId: 'draft-1' });
+  assert.equal(Core.isValidState(state), true);
+  state.tasks[0].draftId = 'x'.repeat(101);
+  assert.equal(Core.isValidState(state), false);
+});

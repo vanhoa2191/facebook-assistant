@@ -176,10 +176,20 @@
   function renderSchedule() {
     const tasks = state.tasks.slice().sort((a, b) => Date.parse(a.time) - Date.parse(b.time));
     const statusText = { scheduled: 'Đã lên lịch', due: 'Đến hạn', done: 'Đã hoàn thành', missed: 'Đã bỏ qua' };
-    return '<div class="grid"><section class="panel purple"><h2>Lịch chạy / nhắc việc</h2><p>Nhắc việc cục bộ bằng Chrome Alarms</p>' + field('Tên công việc', 'taskName', '') + field('Ngày giờ nhắc', 'taskTime', '', 'datetime-local') +
-      button('Lưu nhắc việc', 'addTask', 'primary full') + '<div class="banner">Lịch chỉ nhắc người dùng; không tự thực thi hành động Facebook. Khi đến hạn, biểu tượng extension sẽ hiển thị huy hiệu.</div></section><section class="panel"><h2>Danh sách lịch</h2>' +
-      (tasks.map(t => '<div class="task"><div><strong>' + esc(t.name) + '</strong><time>' + esc(t.time) + '</time><span class="pill">' + esc(statusText[t.status || 'scheduled'] || 'Đã lên lịch') + '</span></div><div class="btnrow">' +
-        (t.status === 'due' ? button('Hoàn thành', 'completeTask', 'primary', t.id) : '') + button('Xóa', 'deleteTask', 'warn', t.id) + '</div></div>').join('') || '<div class="placeholder">Chưa có lịch.</div>') + '</section></div>';
+    const draftOptions = '<option value="">Không gắn bản nháp</option>' + state.drafts.slice().reverse().map(draft =>
+      '<option value="' + esc(draft.id) + '">' + esc((draft.kind || 'source') + ' · ' + draft.text.slice(0, 70)) + '</option>'
+    ).join('');
+    return '<div class="grid"><section class="panel purple"><h2>Lịch chạy / nhắc việc</h2><p>Nhắc việc cục bộ bằng Chrome Alarms</p>' +
+      field('Tên công việc', 'taskName', '') + field('Ngày giờ nhắc', 'taskTime', '', 'datetime-local') +
+      '<div class="field"><label for="taskDraftId">Gắn bản nháp (không bắt buộc)</label><select id="taskDraftId">' + draftOptions + '</select></div>' +
+      button('Lưu nhắc việc', 'addTask', 'primary full') + '<div class="banner">Lịch chỉ nhắc người dùng; không tự thực thi hành động Facebook. Có thể gắn bản nháp để mở nhanh khi đến hạn.</div></section><section class="panel"><h2>Danh sách lịch</h2>' +
+      (tasks.map(t => {
+        const draft = t.draftId ? state.drafts.find(item => item.id === t.draftId) : null;
+        return '<div class="task"><div><strong>' + esc(t.name) + '</strong><time>' + esc(t.time) + '</time><span class="pill">' + esc(statusText[t.status || 'scheduled'] || 'Đã lên lịch') + '</span>' +
+          (draft ? '<p class="task-draft">Bản nháp: ' + esc(draft.text.slice(0, 100)) + '</p>' : '') + '</div><div class="btnrow">' +
+          (draft ? button('Mở nháp', 'openTaskDraft', 'primary', t.id) : '') +
+          (t.status === 'due' ? button('Hoàn thành', 'completeTask', 'primary', t.id) : '') + button('Xóa', 'deleteTask', 'warn', t.id) + '</div></div>';
+      }).join('') || '<div class="placeholder">Chưa có lịch.</div>') + '</section></div>';
   }
   function renderLogs() {
     const query = draftQuery.trim().toLowerCase();
@@ -690,6 +700,17 @@
         state.drafts = state.drafts.filter(draft => draft.id !== id);
         log('Đã xóa bản nháp');
         break;
+      case 'openTaskDraft': {
+        const task = state.tasks.find(item => item.id === id);
+        const draft = task && task.draftId ? state.drafts.find(item => item.id === task.draftId) : null;
+        if (!draft) { toast('Không tìm thấy bản nháp được gắn với nhắc việc.'); return; }
+        draftQuery = draft.text.slice(0, 100);
+        draftKindFilter = 'all';
+        page = 'logs';
+        render();
+        toast('Đã mở thư viện và lọc theo bản nháp của nhắc việc.');
+        return;
+      }
       case 'completeTask': {
         const task = state.tasks.find(item => item.id === id);
         if (task) { task.status = 'done'; log('Đã hoàn thành nhắc việc: ' + task.name); }
@@ -706,7 +727,8 @@
           toast('Nhập tên công việc và thời gian hợp lệ');
           return;
         }
-        state.tasks.push({ id: crypto.randomUUID(), name: nameValue, time: timeValue, status: 'scheduled' });
+        const draftId = $('#taskDraftId') ? $('#taskDraftId').value : '';
+        state.tasks.push({ id: crypto.randomUUID(), name: nameValue, time: timeValue, status: 'scheduled', ...(draftId ? { draftId } : {}) });
         log('Đã lưu nhắc việc: ' + nameValue);
         break;
       }

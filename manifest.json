@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "Facebook AI Assistant",
-  "version": "0.2.0",
-  "description": "Bảng điều khiển hỗ trợ quản lý nội dung Facebook với AI và lưu dữ liệu cục bộ.",
+  "version": "0.3.0",
+  "description": "Trợ lý AI Facebook: quản lý nhóm, bản nháp, Gemini và lịch nhắc việc.",
   "permissions": [
     "storage",
     "alarms"

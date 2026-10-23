@@ -19,6 +19,7 @@
       logs: [],
       drafts: [],
       pageSchedules: [],
+      engagementItems: [],
       moduleNotes: {},
       prompts: {
         share: 'Viết lời dẫn ngắn, tự nhiên, phù hợp với {groupName}, dựa trên nội dung: {postText}. Không thêm thông tin chưa được xác minh.',
@@ -54,18 +55,28 @@
     });
   }
 
-  function isSafeFacebookGroupUrl(value) {
+  function isSafeFacebookUrl(value) {
     if (typeof value !== 'string' || value.length > 2048) return false;
     try {
       const url = new URL(value);
       const host = url.hostname.toLowerCase();
       const facebookHosts = ['facebook.com', 'www.facebook.com', 'm.facebook.com', 'web.facebook.com'];
       return url.protocol === 'https:' && !url.port && facebookHosts.includes(host) &&
-        !url.username && !url.password && /^\/groups\/[^/]+(?:\/|$)/i.test(url.pathname);
+        !url.username && !url.password;
     } catch (_) {
       return false;
     }
   }
+
+  function isSafeFacebookGroupUrl(value) {
+    if (!isSafeFacebookUrl(value)) return false;
+    try {
+      return /^\/groups\/[^/]+(?:\/|$)/i.test(new URL(value).pathname);
+    } catch (_) {
+      return false;
+    }
+  }
+
 
   function isBoundedArray(value) {
     return Array.isArray(value) && value.length <= MAX_ITEMS;
@@ -73,7 +84,7 @@
 
   function isValidState(value) {
     if (!isObject(value) || !isObject(value.settings) || !isObject(value.prompts)) return false;
-    const arrayKeys = ['groups', 'profiles', 'tasks', 'logs', 'drafts', 'pageSchedules'];
+    const arrayKeys = ['groups', 'profiles', 'tasks', 'logs', 'drafts', 'pageSchedules', 'engagementItems'];
     if (!arrayKeys.every(key => isBoundedArray(value[key]))) return false;
     if (!isObject(value.moduleNotes) && value.moduleNotes !== undefined) return false;
 
@@ -90,6 +101,14 @@
       isText(group.id, 100) && group.id.length > 0 &&
       isText(group.name, 200) && group.name.trim().length > 0 &&
       isSafeFacebookGroupUrl(group.url) && typeof group.selected === 'boolean')) return false;
+    if (!value.engagementItems.every(item => isObject(item) &&
+      isText(item.id, 100) && item.id.length > 0 &&
+      isText(item.name, 200) && item.name.trim().length > 0 &&
+      isSafeFacebookUrl(item.url) &&
+      ['like', 'love', 'support', 'comment', 'reply', 'followup'].includes(item.kind) &&
+      isText(item.note, 1000) &&
+      ['pending', 'done'].includes(item.status) &&
+      isText(item.createdAt, 100))) return false;
 
     if (!value.profiles.every(profile => isObject(profile) &&
       isText(profile.id, 100) && isText(profile.name, 200) &&
@@ -188,5 +207,5 @@
     }).join(',')).join('\r\n');
   }
 
-  return { createDefaultState, migrateState, escapeHtml, isSafeFacebookGroupUrl, isValidState, fillPrompt, parseCsv, toCsv };
+  return { createDefaultState, migrateState, escapeHtml, isSafeFacebookUrl, isSafeFacebookGroupUrl, isValidState, fillPrompt, parseCsv, toCsv };
 });

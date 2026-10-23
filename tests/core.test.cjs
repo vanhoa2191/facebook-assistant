@@ -66,3 +66,18 @@ test('prompt placeholders are substituted without evaluating unknown names', () 
 test('CSV protects spreadsheet formulas', () => {
   assert.equal(Core.toCsv([['=1+1', '+cmd', '-2', '@x']]), '"\'=1+1","\'+cmd","\'-2","\'@x"');
 });
+
+
+test('import validation rejects unknown providers and invalid reminder states', () => {
+  const badProvider = Core.createDefaultState();
+  badProvider.settings.provider = 'external-unknown';
+  assert.equal(Core.isValidState(badProvider), false);
+
+  const badProfile = Core.createDefaultState();
+  badProfile.profiles.push({ id: 'p1', name: 'Bad profile', provider: 'unknown' });
+  assert.equal(Core.isValidState(badProfile), false);
+
+  const badTask = Core.createDefaultState();
+  badTask.tasks.push({ id: 't1', name: 'Bad task', time: '2026-10-24T09:00', status: 'run-action' });
+  assert.equal(Core.isValidState(badTask), false);
+});

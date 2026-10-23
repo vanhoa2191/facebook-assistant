@@ -160,3 +160,19 @@ test('local Meta Page schedule records require valid Page IDs and timestamps', (
   state.pageSchedules[0].pageId = 'not-a-page';
   assert.equal(Core.isValidState(state), false);
 });
+
+
+test('manual engagement items require safe Facebook URLs and known statuses', () => {
+  const state = Core.createDefaultState();
+  state.engagementItems.push({
+    id: 'e1', name: 'Review post', url: 'https://www.facebook.com/posts/123',
+    kind: 'comment', note: 'Prepare a thoughtful reply', status: 'pending',
+    createdAt: '2026-10-24T10:00:00.000Z'
+  });
+  assert.equal(Core.isValidState(state), true);
+  state.engagementItems[0].url = 'https://evil.example/posts/123';
+  assert.equal(Core.isValidState(state), false);
+  assert.equal(Core.isSafeFacebookUrl('https://www.facebook.com/posts/123'), true);
+  assert.equal(Core.isSafeFacebookUrl('http://facebook.com/posts/123'), false);
+  assert.equal(Core.isSafeFacebookUrl('https://facebook.com.evil.example/posts/123'), false);
+});

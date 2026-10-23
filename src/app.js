@@ -110,14 +110,28 @@
       button('Lưu ghi chú', 'saveNote', 'primary') + '</section></div>';
   }
   function renderGroups() {
+    const kindNames = { like: 'Thích', love: 'Yêu thích', support: 'Ủng hộ', comment: 'Bình luận', reply: 'Trả lời', followup: 'Theo dõi lại' };
+    const engagementList = (state.engagementItems || []).slice().reverse().slice(0, 8);
+    const engagementHtml = engagementList.length
+      ? engagementList.map(item => '<div class="log"><strong>' + esc(item.name) + '</strong> <span class="pill">' + esc(kindNames[item.kind] || item.kind) + '</span> <span class="pill">' + (item.status === 'done' ? 'Đã xử lý' : 'Chờ xử lý') + '</span>' +
+          '<p>' + esc(item.note || '') + '</p><div class="btnrow">' + button('Mở bài', 'openEngagement', '', item.id) +
+          button(item.status === 'done' ? 'Đánh dấu chờ' : 'Đánh dấu xong', 'toggleEngagement', '', item.id) +
+          button('Xóa', 'deleteEngagement', 'warn', item.id) + '</div></div>').join('')
+      : '<div class="placeholder">Chưa có mục nào. Thêm URL để theo dõi và xử lý thủ công.</div>';
     return '<div class="grid four">' +
       '<section class="panel"><h2>Quản lý nhóm</h2><p>Danh sách nhóm do bạn nhập thủ công</p><div class="metric"><div><small>Tổng nhóm</small>' + state.groups.length + '</div><div><small>Đã chọn</small>' + state.groups.filter(g => g.selected).length + '</div></div>' +
       groupList() + '<div class="btnrow">' + button('Mở tối đa 5 nhóm đã chọn', 'openSelectedGroups') + button('Chọn tất cả', 'selectAll') + button('Bỏ chọn', 'deselectAll') + '</div>' +
       '<div class="btnrow">' + button('Nhập CSV', 'importGroups') + button('Xuất CSV', 'exportGroups') + '</div>' +
       field('Số nhóm mỗi đợt (cấu hình)', 'groupLimit', state.settings.groupLimit, 'number') + field('Khoảng cách (giây)', 'delay', state.settings.delay, 'number') +
       '<div class="banner">Chỉ mở tab nhóm để bạn tự xem và thao tác. Extension không tự đăng, bình luận hoặc gửi lời mời.</div>' + button('Lưu cấu hình', 'saveSettings', 'primary full') + '</section>' +
-      '<section class="panel"><h2>Like / Cảm xúc</h2><p>Phân hệ tham khảo · chưa kích hoạt</p><div class="metric"><div><small>Đã thực hiện</small>0</div><div><small>Đã chọn</small>' + state.groups.filter(g => g.selected).length + '</div></div><div class="placeholder">Tương tác tự động chưa được triển khai.</div></section>' +
-      '<section class="panel"><h2>Bình luận AI</h2><p>Chuẩn bị bình luận nháp</p><div class="metric"><div><small>Đã gửi</small>0</div><div><small>Đã chọn</small>' + state.groups.filter(g => g.selected).length + '</div></div><div class="placeholder">Tạo và duyệt nháp trước khi đăng thủ công.</div></section>' +
+      '<section class="panel"><h2>Theo dõi tương tác</h2><p>Danh sách thủ công để bạn tự mở bài và xử lý</p>' +
+      field('Tên người / bài viết', 'engagementName', '') + field('URL Facebook', 'engagementUrl', '') +
+      '<div class="field"><label for="engagementKind">Loại việc</label><select id="engagementKind">' +
+      [['like','Thích'],['love','Yêu thích'],['support','Ủng hộ'],['comment','Bình luận'],['reply','Trả lời'],['followup','Theo dõi lại']].map(item => '<option value="' + item[0] + '">' + item[1] + '</option>').join('') +
+      '</select></div>' + field('Ghi chú', 'engagementNote', '') + button('Thêm vào danh sách', 'addEngagement', 'primary full') +
+      '<div class="banner">Chỉ theo dõi công việc thủ công. Extension không tự like, bình luận hoặc gửi tin nhắn.</div>' + engagementHtml + '</section>' +
+      '<section class="panel"><h2>Bình luận AI</h2><p>Tạo nháp từ nội dung do bạn cung cấp</p><div class="metric"><div><small>Nháp AI</small>' + state.drafts.filter(d => d.kind === 'ai' || d.kind === 'share').length + '</div><div><small>Đã gửi</small>0</div></div>' +
+      '<div class="placeholder">Dán ngữ cảnh ở module Lấy lại tương tác, tạo bình luận nháp rồi xem lại trước khi tự đăng.</div>' + button('Soạn bình luận AI', 'goEngage', 'primary full') + '</section>' +
       '<section class="panel"><h2>Thêm nhóm</h2><p>Nhập tên và URL nhóm Facebook</p>' + field('Tên nhóm', 'groupName', '') + field('URL nhóm Facebook', 'groupUrl', '') + button('Thêm nhóm vào danh sách', 'addGroup', 'primary full') + '<div class="banner">Chỉ thêm nhóm thủ công. Không tự tìm hoặc tham gia nhóm.</div></section></div>';
   }
 
@@ -419,6 +433,42 @@
         }
         return;
       }
+      case 'goEngage':
+        page = 'engage';
+        render();
+        return;
+      case 'addEngagement': {
+        const name = $('#engagementName').value.trim();
+        const url = $('#engagementUrl').value.trim();
+        const kind = $('#engagementKind').value;
+        const note = $('#engagementNote').value.trim();
+        if (!name || name.length > 200) { toast('Nhập tên người hoặc bài viết.'); return; }
+        if (!Core.isSafeFacebookUrl(url)) { toast('URL phải thuộc Facebook và sử dụng HTTPS.'); return; }
+        if (note.length > 1000) { toast('Ghi chú không được vượt quá 1.000 ký tự.'); return; }
+        state.engagementItems = Array.isArray(state.engagementItems) ? state.engagementItems : [];
+        state.engagementItems.push({ id: crypto.randomUUID(), name, url, kind, note, status: 'pending', createdAt: new Date().toISOString() });
+        if (state.engagementItems.length > 1000) state.engagementItems.shift();
+        log('Đã thêm mục theo dõi tương tác: ' + name);
+        break;
+      }
+      case 'openEngagement': {
+        const item = (state.engagementItems || []).find(entry => entry.id === id);
+        if (!item || !Core.isSafeFacebookUrl(item.url)) { toast('URL Facebook không hợp lệ.'); return; }
+        await chrome.tabs.create({ url: item.url });
+        log('Đã mở mục theo dõi tương tác: ' + item.name);
+        break;
+      }
+      case 'toggleEngagement': {
+        const item = (state.engagementItems || []).find(entry => entry.id === id);
+        if (!item) { toast('Không tìm thấy mục theo dõi.'); return; }
+        item.status = item.status === 'done' ? 'pending' : 'done';
+        log('Đã cập nhật trạng thái tương tác: ' + item.name);
+        break;
+      }
+      case 'deleteEngagement':
+        state.engagementItems = (state.engagementItems || []).filter(entry => entry.id !== id);
+        log('Đã xóa mục theo dõi tương tác');
+        break;
       case 'addGroup': {
         const nameValue = $('#groupName').value.trim();
         const urlValue = $('#groupUrl').value.trim();

@@ -81,3 +81,23 @@ test('import validation rejects unknown providers and invalid reminder states', 
   badTask.tasks.push({ id: 't1', name: 'Bad task', time: '2026-10-24T09:00', status: 'run-action' });
   assert.equal(Core.isValidState(badTask), false);
 });
+
+
+test('group-targeted drafts accept valid Facebook URLs and reject unsafe targets', () => {
+  const state = Core.createDefaultState();
+  state.drafts.push({
+    id: 'd-group', text: 'Draft for group', url: '',
+    createdAt: '2026-10-24T01:00:00.000Z', kind: 'share',
+    targetGroupId: 'g1', targetGroupName: 'Nhóm mẫu',
+    targetGroupUrl: 'https://www.facebook.com/groups/mau'
+  });
+  assert.equal(Core.isValidState(state), true);
+
+  const unsafe = Core.createDefaultState();
+  unsafe.drafts.push({
+    id: 'd-bad', text: 'Bad target', url: '',
+    createdAt: '2026-10-24T01:00:00.000Z', kind: 'share',
+    targetGroupUrl: 'https://evil.example/groups/mau'
+  });
+  assert.equal(Core.isValidState(unsafe), false);
+});

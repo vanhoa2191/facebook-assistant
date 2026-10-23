@@ -154,7 +154,8 @@
       '<div class="banner">Cần Page access token hợp lệ và quyền pages_manage_posts do Meta cấp cho ứng dụng của bạn. Token không được xuất ra file cấu hình hoặc ghi vào nhật ký. Khi đăng bài, nội dung được gửi tới Meta.</div>' +
       '<div class="field"><label for="pageMessage">Nội dung bài viết</label><textarea id="pageMessage" maxlength="60000" placeholder="Kiểm tra kỹ nội dung trước khi đăng công khai..."></textarea></div>' +
       field('Link đính kèm (không bắt buộc, HTTPS)', 'pageLink', '') +
-      button('Đăng bài lên Page', 'publishPagePost', 'primary full') +
+      field('Thời điểm đăng (để trống để đăng ngay)', 'pagePublishTime', '', 'datetime-local') +
+      button('Đăng ngay / lên lịch trên Page', 'publishPagePost', 'primary full') +
       '<div class="placeholder output">' + esc(pagePublishStatus || 'Chưa có kết quả đăng bài.') + '</div>' +
       '</section><section class="panel purple"><h2>Quy trình an toàn</h2><ol><li>Nhập Page ID và Page access token.</li><li>Cấp quyền truy cập Graph API khi Chrome hỏi.</li><li>Soạn bài và xem lại nội dung.</li><li>Xác nhận lần cuối trước khi đăng công khai.</li><li>Kiểm tra ID bài đăng trong nhật ký.</li></ol>' +
       '<div class="banner">Tích hợp này chỉ đăng lên Page được token cho phép. Không đăng lên trang cá nhân hoặc nhóm. Việc dùng API phụ thuộc vào quyền, cấu hình và xét duyệt ứng dụng Meta.</div>' +
@@ -175,21 +176,26 @@
 
   function renderSchedule() {
     const tasks = state.tasks.slice().sort((a, b) => Date.parse(a.time) - Date.parse(b.time));
-    const statusText = { scheduled: 'Đã lên lịch', due: 'Đến hạn', done: 'Đã hoàn thành', missed: 'Đã bỏ qua' };
+    const statusText = { scheduled: 'Đã lên lịch nhắc', due: 'Đến hạn', done: 'Đã hoàn thành', missed: 'Đã bỏ qua' };
     const draftOptions = '<option value="">Không gắn bản nháp</option>' + state.drafts.slice().reverse().map(draft =>
       '<option value="' + esc(draft.id) + '">' + esc((draft.kind || 'source') + ' · ' + draft.text.slice(0, 70)) + '</option>'
     ).join('');
-    return '<div class="grid"><section class="panel purple"><h2>Lịch chạy / nhắc việc</h2><p>Nhắc việc cục bộ bằng Chrome Alarms</p>' +
+    const pageSchedules = (state.pageSchedules || []).slice().sort((a, b) => Date.parse(a.scheduledAt) - Date.parse(b.scheduledAt));
+    return '<div class="grid"><section class="panel purple"><h2>Lịch nhắc việc</h2><p>Nhắc việc cục bộ bằng Chrome Alarms</p>' +
       field('Tên công việc', 'taskName', '') + field('Ngày giờ nhắc', 'taskTime', '', 'datetime-local') +
       '<div class="field"><label for="taskDraftId">Gắn bản nháp (không bắt buộc)</label><select id="taskDraftId">' + draftOptions + '</select></div>' +
-      button('Lưu nhắc việc', 'addTask', 'primary full') + '<div class="banner">Lịch chỉ nhắc người dùng; không tự thực thi hành động Facebook. Có thể gắn bản nháp để mở nhanh khi đến hạn.</div></section><section class="panel"><h2>Danh sách lịch</h2>' +
+      button('Lưu nhắc việc', 'addTask', 'primary full') + '<div class="banner">Nhắc việc chỉ nhắc người dùng; không tự thực thi hành động Facebook. Có thể gắn bản nháp để mở nhanh khi đến hạn.</div></section><section class="panel"><h2>Nhắc việc đã lưu</h2>' +
       (tasks.map(t => {
         const draft = t.draftId ? state.drafts.find(item => item.id === t.draftId) : null;
-        return '<div class="task"><div><strong>' + esc(t.name) + '</strong><time>' + esc(t.time) + '</time><span class="pill">' + esc(statusText[t.status || 'scheduled'] || 'Đã lên lịch') + '</span>' +
+        return '<div class="task"><div><strong>' + esc(t.name) + '</strong><time>' + esc(t.time) + '</time><span class="pill">' + esc(statusText[t.status || 'scheduled'] || 'Đã lên lịch nhắc') + '</span>' +
           (draft ? '<p class="task-draft">Bản nháp: ' + esc(draft.text.slice(0, 100)) + '</p>' : '') + '</div><div class="btnrow">' +
           (draft ? button('Mở nháp', 'openTaskDraft', 'primary', t.id) : '') +
           (t.status === 'due' ? button('Hoàn thành', 'completeTask', 'primary', t.id) : '') + button('Xóa', 'deleteTask', 'warn', t.id) + '</div></div>';
-      }).join('') || '<div class="placeholder">Chưa có lịch.</div>') + '</section></div>';
+      }).join('') || '<div class="placeholder">Chưa có nhắc việc.</div>') + '</section>' +
+      '<section class="panel blue"><h2>Lịch đăng Facebook Page</h2><p>' + pageSchedules.length + ' lịch đã được Meta xác nhận nhận lịch</p>' +
+      (pageSchedules.map(item => '<div class="task"><div><strong>' + esc(item.message.slice(0, 120)) + '</strong><time>' + esc(item.scheduledAt) + '</time><span class="pill">Đã gửi lịch tới Meta</span><small>Page ID: ' + esc(item.pageId) + ' · Post ID: ' + esc(item.id) + '</small></div>' +
+        button('Mở Planner', 'openPagePlanner', 'primary', item.id) + '</div>').join('') || '<div class="placeholder">Chưa có lịch đăng Page do extension tạo.</div>') +
+      '<div class="banner">Meta quản lý thời điểm xuất bản sau khi API xác nhận lịch. Danh sách này là bản ghi cục bộ, không phải trạng thái trực tiếp từ Meta.</div></section></div>';
   }
   function renderLogs() {
     const query = draftQuery.trim().toLowerCase();
@@ -356,6 +362,17 @@
         const version = $('#graphVersion').value.trim() || 'v26.0';
         const message = $('#pageMessage').value.trim();
         const link = $('#pageLink').value.trim();
+        const scheduleValue = $('#pagePublishTime') ? $('#pagePublishTime').value : '';
+        let scheduledPublishAt = '';
+        if (scheduleValue) {
+          const scheduleDate = new Date(scheduleValue);
+          const scheduleMs = scheduleDate.getTime();
+          const now = Date.now();
+          if (!Number.isFinite(scheduleMs)) { toast('Thời điểm đăng không hợp lệ.'); return; }
+          if (scheduleMs < now + 10 * 60 * 1000) { toast('Hãy chọn thời điểm ít nhất 10 phút trong tương lai.'); return; }
+          if (scheduleMs > now + 30 * 24 * 60 * 60 * 1000) { toast('Bản hiện tại chỉ cho phép lên lịch tối đa 30 ngày.'); return; }
+          scheduledPublishAt = scheduleDate.toISOString();
+        }
         if (!/^[0-9]{5,30}$/.test(pageId)) { toast('Nhập Page ID hợp lệ trước khi đăng.'); return; }
         if (!message || message.length > 60000) { toast('Nội dung bài viết phải có từ 1 đến 60.000 ký tự.'); return; }
         if (link) {
@@ -368,16 +385,31 @@
         const stored = await chrome.storage.session.get(PAGE_TOKEN_KEY);
         const token = stored[PAGE_TOKEN_KEY];
         if (!token) { toast('Hãy lưu Page access token trong phiên Chrome trước.'); return; }
-        if (!window.confirm('Bạn đang đăng công khai lên Facebook Page ' + pageId + '. Sau khi xác nhận, bài viết sẽ được gửi tới Meta. Tiếp tục?')) return;
+        const confirmText = scheduledPublishAt
+          ? 'Bạn đang lên lịch đăng công khai lên Facebook Page ' + pageId + ' vào ' + scheduledPublishAt + '. Meta sẽ quản lý thời điểm đăng sau khi xác nhận. Tiếp tục?'
+          : 'Bạn đang đăng công khai lên Facebook Page ' + pageId + '. Sau khi xác nhận, bài viết sẽ được gửi tới Meta. Tiếp tục?';
+        if (!window.confirm(confirmText)) return;
         state.settings.pageId = pageId;
         state.settings.graphVersion = version;
         try {
-          const result = await Facebook.publishPagePost({ pageId, accessToken: token, message, link, version });
-          pagePublishStatus = 'Đăng thành công. Post ID: ' + result.id;
-          log('Đã đăng bài lên Page ' + pageId + '; Post ID: ' + result.id);
+          const result = await Facebook.publishPagePost({ pageId, accessToken: token, message, link, version, scheduledPublishAt: scheduledPublishAt || undefined });
+          if (result.scheduled) {
+            state.pageSchedules = Array.isArray(state.pageSchedules) ? state.pageSchedules : [];
+            state.pageSchedules.push({
+              id: result.id, pageId, message, link,
+              scheduledAt: result.scheduledAt || scheduledPublishAt,
+              createdAt: new Date().toISOString(), status: 'scheduled'
+            });
+            if (state.pageSchedules.length > 500) state.pageSchedules.shift();
+            pagePublishStatus = 'Đã gửi lịch đăng tới Meta. Post ID: ' + result.id;
+            log('Đã lên lịch đăng Page ' + pageId + ' vào ' + (result.scheduledAt || scheduledPublishAt) + '; Post ID: ' + result.id);
+          } else {
+            pagePublishStatus = 'Đăng thành công. Post ID: ' + result.id;
+            log('Đã đăng bài lên Page ' + pageId + '; Post ID: ' + result.id);
+          }
           await save();
           render();
-          toast('Đã đăng bài lên Page.');
+          toast(result.scheduled ? 'Đã gửi lịch đăng tới Meta.' : 'Đã đăng bài lên Page.');
         } catch (error) {
           pagePublishStatus = error.message;
           log('Đăng bài Page thất bại: ' + error.message);
@@ -700,6 +732,13 @@
         state.drafts = state.drafts.filter(draft => draft.id !== id);
         log('Đã xóa bản nháp');
         break;
+      case 'openPagePlanner': {
+        const item = (state.pageSchedules || []).find(schedule => schedule.id === id);
+        if (!item || !/^[0-9]{5,30}$/.test(item.pageId)) { toast('Không tìm thấy lịch Page hợp lệ.'); return; }
+        await chrome.tabs.create({ url: 'https://business.facebook.com/latest/planner?asset_id=' + encodeURIComponent(item.pageId) });
+        log('Đã mở Meta Business Suite Planner cho Page ' + item.pageId);
+        return;
+      }
       case 'openTaskDraft': {
         const task = state.tasks.find(item => item.id === id);
         const draft = task && task.draftId ? state.drafts.find(item => item.id === task.draftId) : null;

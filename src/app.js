@@ -3,8 +3,11 @@
 (function () {
   const Core = window.FAACore;
   const Gemini = window.FAAAI;
+  const Facebook = window.FAAFacebook;
   const GEMINI_ORIGIN = 'https://generativelanguage.googleapis.com/*';
   const GEMINI_KEY = 'faa.geminiApiKey';
+  const GRAPH_ORIGIN = 'https://graph.facebook.com/*';
+  const PAGE_TOKEN_KEY = 'faa.facebookPageToken';
   const NAV = [
     ['connect', '♧', 'Kết bạn'], ['scrape', '▤', 'Cào bài'], ['groups', '♧', 'Nhóm'],
     ['pages', '⚑', 'Nuôi Page'], ['share', '↗', 'Share bài'], ['sales', '▣', 'Đăng bán'],
@@ -31,6 +34,9 @@
   let aiKeyPresent = false;
   let aiPermissionPresent = false;
   let aiOutput = '';
+  let pageTokenPresent = false;
+  let graphPermissionPresent = false;
+  let pagePublishStatus = '';
   let draftQuery = '';
   let draftKindFilter = 'all';
 
@@ -137,6 +143,23 @@
       '<div class="btnrow">' + button('Lưu kết quả AI thành nháp', 'saveExternalAiDraft') + button('Lưu nguyên văn đầu vào', 'saveAiDraft') + '</div>' +
       '<h3>Nháp gần đây</h3>' + draftList(5) + '</section></div>';
   }
+  function renderPages() {
+    return '<div class="grid"><section class="panel blue"><h2>Đăng bài lên Facebook Page</h2><p>Sử dụng Meta Graph API chính thức với Page access token của bạn</p>' +
+      field('Page ID (chỉ số)', 'pageId', state.settings.pageId || '') +
+      field('Graph API version', 'graphVersion', state.settings.graphVersion || 'v26.0') +
+      '<div class="field"><label for="pageToken">Page access token (chỉ lưu trong phiên Chrome)</label><input id="pageToken" type="password" maxlength="500" autocomplete="new-password" placeholder="Dán Page access token"></div>' +
+      '<div class="btnrow">' + button('Lưu token trong phiên', 'savePageToken', 'primary') + button('Xóa token', 'clearPageToken', 'warn') + '</div>' +
+      '<div class="btnrow">' + button('Cấp quyền Graph API', 'requestGraphPermission') + '</div>' +
+      '<div class="status-box"><span class="pill">' + (graphPermissionPresent ? 'Đã cấp quyền Graph API' : 'Chưa cấp quyền Graph API') + '</span> <span class="pill">' + (pageTokenPresent ? 'Đã có token trong phiên' : 'Chưa lưu token') + '</span></div>' +
+      '<div class="banner">Cần Page access token hợp lệ và quyền pages_manage_posts do Meta cấp cho ứng dụng của bạn. Token không được xuất ra file cấu hình hoặc ghi vào nhật ký. Khi đăng bài, nội dung được gửi tới Meta.</div>' +
+      '<div class="field"><label for="pageMessage">Nội dung bài viết</label><textarea id="pageMessage" maxlength="60000" placeholder="Kiểm tra kỹ nội dung trước khi đăng công khai..."></textarea></div>' +
+      field('Link đính kèm (không bắt buộc, HTTPS)', 'pageLink', '') +
+      button('Đăng bài lên Page', 'publishPagePost', 'primary full') +
+      '<div class="placeholder output">' + esc(pagePublishStatus || 'Chưa có kết quả đăng bài.') + '</div>' +
+      '</section><section class="panel purple"><h2>Quy trình an toàn</h2><ol><li>Nhập Page ID và Page access token.</li><li>Cấp quyền truy cập Graph API khi Chrome hỏi.</li><li>Soạn bài và xem lại nội dung.</li><li>Xác nhận lần cuối trước khi đăng công khai.</li><li>Kiểm tra ID bài đăng trong nhật ký.</li></ol>' +
+      '<div class="banner">Tích hợp này chỉ đăng lên Page được token cho phép. Không đăng lên trang cá nhân hoặc nhóm. Việc dùng API phụ thuộc vào quyền, cấu hình và xét duyệt ứng dụng Meta.</div>' +
+      '<h3>Nháp gần đây</h3>' + draftList(5) + '</section></div>';
+  }
   function renderShare() {
     return '<div class="grid"><section class="panel blue"><h2>Chia sẻ bài vào nhóm</h2><p>Tạo lời dẫn phù hợp với nhóm; chưa tự đăng</p>' +
       field('Link bài viết Facebook (không bắt buộc)', 'postUrl', '') +
@@ -189,6 +212,7 @@
   }
   function renderPage() {
     if (page === 'groups') return renderGroups();
+    if (page === 'pages') return renderPages();
     if (page === 'ai') return renderAI();
     if (page === 'share') return renderShare();
     if (page === 'schedule') return renderSchedule();
@@ -221,10 +245,17 @@
   }
   async function refreshAiStatus() {
     try {
-      const stored = await chrome.storage.session.get(GEMINI_KEY);
+      const stored = await chrome.storage.session.get([GEMINI_KEY, PAGE_TOKEN_KEY]);
       aiKeyPresent = typeof stored[GEMINI_KEY] === 'string' && stored[GEMINI_KEY].length > 0;
+      pageTokenPresent = typeof stored[PAGE_TOKEN_KEY] === 'string' && stored[PAGE_TOKEN_KEY].length > 0;
       aiPermissionPresent = await chrome.permissions.contains({ origins: [GEMINI_ORIGIN] });
-    } catch (_) { aiKeyPresent = false; aiPermissionPresent = false; }
+      graphPermissionPresent = await chrome.permissions.contains({ origins: [GRAPH_ORIGIN] });
+    } catch (_) {
+      aiKeyPresent = false;
+      pageTokenPresent = false;
+      aiPermissionPresent = false;
+      graphPermissionPresent = false;
+    }
   }
   async function geminiRequest(prompt) {
     if (state.settings.provider !== 'gemini') { toast('Hãy chọn Gemini API trong Provider trước.'); return null; }
@@ -275,6 +306,76 @@
         state.settings.model = $('#model') ? $('#model').value.trim().slice(0, 120) : state.settings.model;
         log('Đã lưu cấu hình');
         break;
+      }
+      case 'savePageToken': {
+        const pageId = $('#pageId').value.trim();
+        const token = $('#pageToken').value.trim();
+        const version = $('#graphVersion').value.trim() || 'v26.0';
+        if (!/^[0-9]{5,30}$/.test(pageId)) { toast('Page ID phải là dãy số hợp lệ.'); return; }
+        if (token.length < 10 || token.length > 500) { toast('Page access token phải có từ 10 đến 500 ký tự.'); return; }
+        if (!/^v[0-9]{1,2}\.0$/.test(version)) { toast('Phiên bản Graph API không hợp lệ, ví dụ v26.0.'); return; }
+        await chrome.storage.session.set({ [PAGE_TOKEN_KEY]: token });
+        state.settings.pageId = pageId;
+        state.settings.graphVersion = version;
+        pageTokenPresent = true;
+        log('Đã lưu Page access token trong phiên Chrome');
+        await save();
+        render();
+        toast('Đã lưu token tạm thời; token không được ghi vào nhật ký.');
+        return;
+      }
+      case 'clearPageToken':
+        await chrome.storage.session.remove(PAGE_TOKEN_KEY);
+        pageTokenPresent = false;
+        log('Đã xóa Page access token khỏi phiên Chrome');
+        await save();
+        render();
+        toast('Đã xóa token khỏi phiên hiện tại');
+        return;
+      case 'requestGraphPermission': {
+        const granted = await chrome.permissions.request({ origins: [GRAPH_ORIGIN] });
+        graphPermissionPresent = granted;
+        if (granted) log('Đã cấp quyền Facebook Graph API');
+        await save();
+        render();
+        toast(granted ? 'Đã cấp quyền Graph API' : 'Chưa cấp quyền Graph API');
+        return;
+      }
+      case 'publishPagePost': {
+        const pageId = $('#pageId').value.trim();
+        const version = $('#graphVersion').value.trim() || 'v26.0';
+        const message = $('#pageMessage').value.trim();
+        const link = $('#pageLink').value.trim();
+        if (!/^[0-9]{5,30}$/.test(pageId)) { toast('Nhập Page ID hợp lệ trước khi đăng.'); return; }
+        if (!message || message.length > 60000) { toast('Nội dung bài viết phải có từ 1 đến 60.000 ký tự.'); return; }
+        if (link) {
+          let validLink = false;
+          try { validLink = new URL(link).protocol === 'https:' && link.length <= 2048; } catch (_) {}
+          if (!validLink) { toast('Link đính kèm phải là HTTPS hợp lệ.'); return; }
+        }
+        if (!/^v[0-9]{1,2}\.0$/.test(version)) { toast('Phiên bản Graph API không hợp lệ.'); return; }
+        if (!await chrome.permissions.contains({ origins: [GRAPH_ORIGIN] })) { toast('Hãy cấp quyền Graph API trước khi đăng.'); return; }
+        const stored = await chrome.storage.session.get(PAGE_TOKEN_KEY);
+        const token = stored[PAGE_TOKEN_KEY];
+        if (!token) { toast('Hãy lưu Page access token trong phiên Chrome trước.'); return; }
+        if (!window.confirm('Bạn đang đăng công khai lên Facebook Page ' + pageId + '. Sau khi xác nhận, bài viết sẽ được gửi tới Meta. Tiếp tục?')) return;
+        state.settings.pageId = pageId;
+        state.settings.graphVersion = version;
+        try {
+          const result = await Facebook.publishPagePost({ pageId, accessToken: token, message, link, version });
+          pagePublishStatus = 'Đăng thành công. Post ID: ' + result.id;
+          log('Đã đăng bài lên Page ' + pageId + '; Post ID: ' + result.id);
+          await save();
+          render();
+          toast('Đã đăng bài lên Page.');
+        } catch (error) {
+          pagePublishStatus = error.message;
+          log('Đăng bài Page thất bại: ' + error.message);
+          await save();
+          render();
+          toast(error.message);
+        }
+        return;
       }
       case 'addGroup': {
         const nameValue = $('#groupName').value.trim();

@@ -7,9 +7,11 @@ const assert = require('node:assert/strict');
 const root = path.resolve(__dirname, '..');
 const read = file => fs.readFileSync(path.join(root, file), 'utf8');
 const manifest = JSON.parse(read('manifest.json'));
+const packageJson = JSON.parse(read('package.json'));
 
 assert.equal(manifest.manifest_version, 3, 'Manifest V3 is required');
 assert.equal(manifest.name, 'Facebook AI Assistant');
+assert.equal(manifest.version, packageJson.version, 'Manifest and package versions must match');
 assert.ok(manifest.options_page, 'options_page must be declared');
 assert.ok(fs.existsSync(path.join(root, manifest.options_page)), 'options page file must exist');
 assert.ok(manifest.background && fs.existsSync(path.join(root, manifest.background.service_worker)), 'service worker must exist');
@@ -20,6 +22,7 @@ assert.equal(manifest.host_permissions, undefined, 'No permanent host permission
 assert.equal(manifest.content_scripts, undefined, 'No content scripts in this phase');
 
 const dashboard = read('dashboard.html');
+assert.ok(dashboard.includes('DEV ' + manifest.version), 'Dashboard version label must match the manifest');
 assert.ok(dashboard.includes('src/core.js'), 'core script must be loaded');
 assert.ok(dashboard.includes('src/ai-provider.js'), 'AI provider must be loaded');
 assert.ok(dashboard.includes('src/facebook-provider.js'), 'Facebook Pages provider must be loaded');

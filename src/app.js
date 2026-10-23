@@ -58,9 +58,43 @@
   }
 
 
+  function modulePromptKey() {
+    return ({
+      connect: 'comment',
+      scrape: 'summary',
+      pages: 'feed',
+      sales: 'sales',
+      learn: 'summary',
+      feed: 'feed',
+      engage: 'comment'
+    })[page] || 'general';
+  }
+
   function generic(title, description) {
     const note = state.moduleNotes[page] || '';
-    return '<div class="grid"><section class="panel"><h2>' + esc(title) + '</h2><p>' + esc(description) + '</p><div class="placeholder" style="margin-top:20px">Module đã có vị trí trong kiến trúc.<br>Chưa có kết nối hoặc hành động tự động trong giai đoạn 1.</div></section><section class="panel blue"><h2>Ghi chú nghiệp vụ</h2><div class="field"><label for="moduleNote">Ghi chú nội bộ</label><textarea id="moduleNote" maxlength="2000" placeholder="Ghi yêu cầu cho module này...">' + esc(note) + '</textarea></div>' + button('Lưu ghi chú', 'saveNote', 'primary') + '</section></div>';
+    const promptKey = modulePromptKey();
+    const prompt = state.prompts[promptKey] || state.prompts.general || 'Hãy xử lý nội dung sau: {content}';
+    const inputLabel = page === 'scrape' || page === 'learn'
+      ? 'Nội dung bài viết / trao đổi bạn được phép sử dụng'
+      : page === 'sales' ? 'Thông tin sản phẩm hoặc dịch vụ' : 'Yêu cầu hoặc nội dung đầu vào';
+    const safetyNote = page === 'scrape' || page === 'learn'
+      ? 'Dán nội dung bạn được phép truy cập. Extension không tự quét hoặc thu thập dữ liệu Facebook.'
+      : page === 'connect'
+        ? 'Chỉ tạo bản nháp tin nhắn. Extension không tự gửi lời mời kết bạn.'
+        : page === 'pages'
+          ? 'Dùng để lên ý tưởng và soạn nội dung. Chưa tự đăng lên Page.'
+          : page === 'sales'
+            ? 'Kiểm tra giá, đặc tính và tuyên bố sản phẩm trước khi sử dụng.'
+            : page === 'engage'
+              ? 'Bản nháp chỉ dùng để người dùng xem lại; không tự bình luận hoặc gửi tin nhắn.'
+              : 'Nội dung được lưu thành bản nháp để xem lại.';
+    return '<div class="grid"><section class="panel blue"><h2>' + esc(title) + '</h2><p>' + esc(description) + '</p>' +
+      '<div class="field"><label for="modulePrompt">Prompt</label><textarea id="modulePrompt" maxlength="20000">' + esc(prompt) + '</textarea></div>' +
+      '<div class="field"><label for="moduleInput">' + esc(inputLabel) + '</label><textarea id="moduleInput" maxlength="20000" placeholder="Dán nội dung hoặc nhập yêu cầu..."></textarea></div>' +
+      '<div class="btnrow">' + button('Tạo bản nháp bằng Gemini', 'generateModuleDraft', 'primary') + button('Lưu nội dung nguồn', 'saveModuleDraft') + '</div>' +
+      '<div class="banner">' + esc(safetyNote) + '</div><h3>Nháp gần đây</h3>' + draftList(4) +
+      '</section><section class="panel blue"><h2>Ghi chú nghiệp vụ</h2><div class="field"><label for="moduleNote">Ghi chú nội bộ</label><textarea id="moduleNote" maxlength="2000" placeholder="Ghi yêu cầu cho module này...">' + esc(note) + '</textarea></div>' +
+      button('Lưu ghi chú', 'saveNote', 'primary') + '</section></div>';
   }
   function renderGroups() {
     return '<div class="grid four">' +
@@ -391,6 +425,36 @@
         }
         state.tasks.push({ id: crypto.randomUUID(), name: nameValue, time: timeValue, status: 'scheduled' });
         log('Đã lưu nhắc việc: ' + nameValue);
+        break;
+      }
+      case 'generateModuleDraft': {
+        const input = $('#moduleInput').value.trim();
+        const template = $('#modulePrompt').value.trim();
+        if (!input || input.length > 20000) { toast('Nhập nội dung đầu vào hợp lệ'); return; }
+        const promptKey = modulePromptKey();
+        state.prompts[promptKey] = template.slice(0, 20000);
+        let prompt = Core.fillPrompt(state.prompts[promptKey], { content: input });
+        if (!state.prompts[promptKey].includes('{content}')) prompt += '\n\nNội dung được cung cấp:\n' + input;
+        try {
+          const output = await geminiRequest(prompt);
+          if (!output) return;
+          addDraft(output, '', 'ai');
+          log('Đã tạo bản nháp bằng Gemini: ' + TITLES[page]);
+          break;
+        } catch (error) {
+          log('Gemini lỗi tại module ' + TITLES[page] + ': ' + error.message);
+          await save();
+          toast(error.message);
+          return;
+        }
+      }
+      case 'saveModuleDraft': {
+        const input = $('#moduleInput').value.trim();
+        if (!input || input.length > 20000) { toast('Nhập nội dung đầu vào hợp lệ'); return; }
+        const promptKey = modulePromptKey();
+        state.prompts[promptKey] = $('#modulePrompt').value.slice(0, 20000);
+        addDraft(input, '', 'source');
+        log('Đã lưu nội dung nguồn từ module: ' + TITLES[page]);
         break;
       }
       case 'saveNote': {

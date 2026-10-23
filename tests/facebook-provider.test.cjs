@@ -30,7 +30,7 @@ test('publishes a Page post using a POST body and never puts the token in the UR
     version: 'v26.0',
     fetchImpl
   });
-  assert.deepEqual(result, { id: '12345678_98765432', pageId: '12345678', version: 'v26.0' });
+  assert.deepEqual(result, { id: '12345678_98765432', pageId: '12345678', version: 'v26.0', scheduled: false, scheduledAt: null });
   assert.equal(request.options.method, 'POST');
   assert.match(request.url, /v26\.0\/12345678\/feed$/);
   assert.equal(request.url.includes('test-page-token-12345'), false);

@@ -87,7 +87,7 @@ test('navigation opens the AI and sales modules without runtime errors', async (
   } } });
   assert.equal(elements['#pageTitle'].textContent, 'Nuôi Page');
   assert.match(elements['#view'].innerHTML, /Page access token/);
-  assert.match(elements['#view'].innerHTML, /Đăng bài lên Page/);
+  assert.match(elements['#view'].innerHTML, /Đăng ngay \/ lên lịch trên Page/);
   assert.match(elements['#view'].innerHTML, /pagePublishTime/);
 
   click({ target: { closest(selector) {

@@ -35,8 +35,9 @@
   function field(label, id, value, type) {
     return '<div class="field"><label for="' + esc(id) + '">' + esc(label) + '</label><input id="' + esc(id) + '" type="' + (type || 'text') + '" value="' + esc(value == null ? '' : value) + '"></div>';
   }
-  function button(label, action, extra) {
-    return '<button type="button" class="btn ' + (extra || '') + '" data-action="' + esc(action) + '">' + esc(label) + '</button>';
+  function button(label, action, extra, id) {
+    return '<button type="button" class="btn ' + (extra || '') + '" data-action="' + esc(action) + '"' +
+      (id == null ? '' : ' data-id="' + esc(id) + '"') + '>' + esc(label) + '</button>';
   }
   function groupList() {
     if (!state.groups.length) return '<div class="placeholder">Chưa có nhóm. Thêm nhóm thủ công bằng tên và URL để bắt đầu.</div>';

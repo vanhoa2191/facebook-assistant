@@ -527,6 +527,33 @@
     if (state.drafts.length > 1000) state.drafts.shift();
     return draft;
   }
+  function upsertWeeklyReport(report) {
+    state.weeklyReports = Array.isArray(state.weeklyReports) ? state.weeklyReports : [];
+    const index = state.weeklyReports.findIndex(item => item.id === report.id);
+    if (index >= 0) state.weeklyReports[index] = report;
+    else state.weeklyReports.push(report);
+    if (state.weeklyReports.length > 104) state.weeklyReports.splice(0, state.weeklyReports.length - 104);
+    return report;
+  }
+  function weeklyAiPrompt(report) {
+    const start = Date.parse(report.periodStart);
+    const end = Date.parse(report.periodEnd);
+    const observations = (state.observations || []).filter(item => {
+      const time = Date.parse(item.capturedAt);
+      return Number.isFinite(time) && time >= start && time <= end;
+    }).slice(-20);
+    const evidence = observations.map((item, index) =>
+      '[' + (index + 1) + '] Thời gian: ' + item.capturedAt +
+      '\nHồ sơ: ' + (item.contactName || 'Chưa gán hồ sơ') +
+      '\nNguồn: ' + item.sourceUrl +
+      '\nNội dung/quan sát: ' + item.text.slice(0, 1200) +
+      (item.analysisText ? '\nPhân tích trước đó: ' + item.analysisText.slice(0, 600) : '')
+    ).join('\n\n').slice(0, 18000);
+    return Core.fillPrompt(state.prompts.profileAnalysis, {
+      content: report.summary + '\n\nDữ liệu nguồn đã lưu trong kỳ (tối đa 20 quan sát gần nhất):\n' +
+        (evidence || 'Không có nội dung nguồn trong kỳ.')
+    });
+  }
   function reviewStatusLabel(status) {
     return ({ draft: 'Chờ duyệt', approved: 'Đã duyệt · chờ đăng', rejected: 'Đã từ chối', scheduled: 'Đã lên lịch', published: 'Đã đăng', failed: 'Đăng thất bại' })[status || 'draft'] || 'Chờ duyệt';
   }

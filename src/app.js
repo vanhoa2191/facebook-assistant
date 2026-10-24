@@ -44,6 +44,8 @@
   let metaWebLastSuccess = false;
   let metaWebStatus = '';
   let pageComposerDraft = '';
+  let pageComposerLink = '';
+  let pageComposerSchedule = '';
   let activePageDraftId = null;
   let reviewStatusFilter = 'draft';
   let pagePublishStatus = '';
@@ -249,8 +251,8 @@
       '<div class="field"><label for="pageAiBrief">Mô tả để Meta AI soạn bài</label><textarea id="pageAiBrief" maxlength="10000" placeholder="Mục tiêu, đối tượng, ý chính, ưu đãi..."></textarea></div>' +
       button('Soạn bài bằng Meta AI Web', 'generateMetaPageDraft', 'primary full') +
       '<div class="field"><label for="pageMessage">Nội dung bài viết — xem lại trước khi duyệt đăng</label><textarea id="pageMessage" maxlength="20000" placeholder="Kiểm tra kỹ nội dung trước khi đăng công khai...">' + esc(pageComposerDraft) + '</textarea></div>' +
-      field('Link đính kèm (không bắt buộc, HTTPS)', 'pageLink', '') +
-      field('Thời điểm đăng (để trống để đăng ngay)', 'pagePublishTime', '', 'datetime-local') +
+      field('Link đính kèm (không bắt buộc, HTTPS)', 'pageLink', pageComposerLink) +
+      field('Thời điểm đăng (để trống để đăng ngay)', 'pagePublishTime', pageComposerSchedule, 'datetime-local') +
       '<div class="btnrow">' + button('Lưu chỉnh sửa thành nháp', 'savePageDraft') + button('Đăng ngay / lên lịch trên Page', 'publishPagePost', 'primary') + '</div>' +
       '<div class="placeholder output">' + esc(pagePublishStatus || 'Chưa có kết quả đăng bài.') + '</div>' +
       '</section><section class="panel purple"><h2>Quy trình an toàn</h2><ol><li>Nhập Page ID và Page access token.</li><li>Cấp quyền truy cập Graph API khi Chrome hỏi.</li><li>Soạn bài và xem lại nội dung.</li><li>Xác nhận lần cuối trước khi đăng công khai.</li><li>Kiểm tra ID bài đăng trong nhật ký.</li></ol>' +
@@ -548,6 +550,8 @@
         draft.publishError = '';
         activePageDraftId = draft.id;
         pageComposerDraft = draft.text;
+        pageComposerLink = draft.url || '';
+        pageComposerSchedule = '';
         pagePublishStatus = 'Bản nháp đã được duyệt sơ bộ. Hãy kiểm tra lần cuối trước khi đăng.';
         page = 'pages';
         log('Đã duyệt bản nháp để chuyển sang trình soạn Page: ' + draft.id);
@@ -580,6 +584,8 @@
         if (!draft) { toast('Không tìm thấy bản nháp.'); return; }
         if (['published', 'scheduled'].includes(draft.reviewStatus)) { toast('Bản nháp này đã đăng hoặc đã lên lịch.'); return; }
         pageComposerDraft = draft.text;
+        pageComposerLink = draft.url || '';
+        pageComposerSchedule = '';
         activePageDraftId = draft.id;
         if (!draft.approvedAt) { draft.reviewStatus = 'approved'; draft.approvedAt = new Date().toISOString(); }
         page = 'pages';
@@ -640,6 +646,8 @@
           activePageDraftId = draft.id;
         }
         pageComposerDraft = message;
+        pageComposerLink = link;
+        pageComposerSchedule = '';
         log('Đã lưu nội dung Page thành bản nháp chờ duyệt: ' + draft.id);
         await save();
         render();
@@ -651,7 +659,9 @@
         const version = $('#graphVersion').value.trim() || 'v26.0';
         const message = $('#pageMessage').value.trim();
         const link = $('#pageLink').value.trim();
-        const scheduleValue = $('#pagePublishTime') ? $('#pagePublishTime').value : '';
+        const scheduleValue = $('#pagePublishTime') ? $('#pagePublishTime').value : pageComposerSchedule;
+        pageComposerLink = link;
+        pageComposerSchedule = scheduleValue;
         let scheduledPublishAt = '';
         if (scheduleValue) {
           const scheduleDate = new Date(scheduleValue);
@@ -713,6 +723,8 @@
           }
           activePageDraftId = null;
           pageComposerDraft = '';
+          pageComposerLink = '';
+          pageComposerSchedule = '';
           await save();
           render();
           toast(result.scheduled ? 'Đã gửi lịch đăng tới Meta.' : 'Đã đăng bài lên Page.');
@@ -1370,12 +1382,17 @@
       const navButton = event.target.closest('[data-nav]');
       if (navButton) {
         page = navButton.dataset.nav;
-        if (page === 'pages') { activePageDraftId = null; pageComposerDraft = ''; pagePublishStatus = ''; }
+        if (page === 'pages') { activePageDraftId = null; pageComposerDraft = ''; pageComposerLink = ''; pageComposerSchedule = ''; pagePublishStatus = ''; }
         render();
         return;
       }
       const actionButton = event.target.closest('[data-action]');
       if (actionButton) action(actionButton.dataset.action, actionButton.dataset.id).catch(() => toast('Không thể hoàn tất thao tác.'));
+    });
+    document.addEventListener('input', event => {
+      if (event.target.id === 'pageMessage') pageComposerDraft = event.target.value;
+      if (event.target.id === 'pageLink') pageComposerLink = event.target.value;
+      if (event.target.id === 'pagePublishTime') pageComposerSchedule = event.target.value;
     });
     document.addEventListener('change', event => {
       if (!event.target.classList.contains('group-check')) return;

@@ -2,7 +2,7 @@
 
 Chrome Extension Manifest V3 with a Vietnamese dashboard for managing Facebook content workflows and AI-assisted drafts.
 
-## Phase 1–6 scope
+## Phase 1–7 scope
 
 - Thirteen navigation modules aligned with the reference screenshots, including a dedicated review queue.
 - Local group list management, selection, CSV import/export, and safe URL validation.

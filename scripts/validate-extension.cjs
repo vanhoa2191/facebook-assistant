@@ -18,7 +18,7 @@ assert.ok(manifest.background && fs.existsSync(path.join(root, manifest.backgrou
 assert.ok(Array.isArray(manifest.permissions), 'permissions must be an array');
 assert.deepEqual([...manifest.permissions].sort(), ['alarms', 'storage'], 'Only storage and alarms are required permissions');
 assert.deepEqual([...manifest.optional_permissions].sort(), ['notifications', 'scripting'], 'Only notifications and scripting may be requested as optional permissions');
-assert.deepEqual([...manifest.optional_host_permissions].sort(), ['https://generativelanguage.googleapis.com/*', 'https://graph.facebook.com/*', 'https://meta.ai/*', 'https://www.meta.ai/*'].sort(), 'Only Gemini, Facebook Graph API, and Meta AI Web origins may be requested optionally');
+assert.deepEqual([...manifest.optional_host_permissions].sort(), ['https://generativelanguage.googleapis.com/*', 'https://graph.facebook.com/*', 'https://m.facebook.com/*', 'https://meta.ai/*', 'https://web.facebook.com/*', 'https://www.facebook.com/*'].sort(), 'Only Gemini, Facebook visible-post capture, Facebook Graph API, and Meta AI Web origins may be requested optionally');
 assert.equal(manifest.host_permissions, undefined, 'No permanent host permissions');
 assert.equal(manifest.content_scripts, undefined, 'No content scripts in this phase');
 
@@ -33,7 +33,7 @@ assert.ok(dashboard.indexOf('src/core.js') < dashboard.indexOf('src/app.js'), 'c
 assert.ok(dashboard.indexOf('src/ai-provider.js') < dashboard.indexOf('src/app.js'), 'AI provider must load before app');
 assert.ok(dashboard.indexOf('src/facebook-provider.js') < dashboard.indexOf('src/app.js'), 'Facebook provider must load before app');
 
-for (const file of ['src/core.js', 'src/ai-provider.js', 'src/facebook-provider.js', 'src/meta-ai-bridge.js', 'src/app.js', 'src/background.js', 'src/notification.svg', 'src/styles.css']) {
+for (const file of ['src/core.js', 'src/ai-provider.js', 'src/facebook-provider.js', 'src/facebook-page-bridge.js', 'src/meta-ai-bridge.js', 'src/app.js', 'src/background.js', 'src/notification.svg', 'src/styles.css']) {
   assert.ok(fs.statSync(path.join(root, file)).size > 0, file + ' must not be empty');
 }
 const core = require('../src/core.js');

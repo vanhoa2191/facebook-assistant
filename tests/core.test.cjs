@@ -1,0 +1,310 @@
+'use strict';
+
+const test = require('node:test');
+const assert = require('node:assert/strict');
+const Core = require('../src/core.js');
+
+test('default state is valid and each call returns independent arrays', () => {
+  const first = Core.createDefaultState();
+  const second = Core.createDefaultState();
+  assert.equal(Core.isValidState(first), true);
+  first.groups.push({ id: 'g1', name: 'Example', url: 'https://www.facebook.com/groups/example', selected: false });
+  assert.equal(second.groups.length, 0);
+});
+
+test('HTML escaping encodes markup and attribute delimiters', () => {
+  assert.equal(Core.escapeHtml('<script x="y">a & b</script>'), '&lt;script x=&quot;y&quot;&gt;a &amp; b&lt;/script&gt;');
+  assert.equal(Core.escapeHtml("'"), '&#39;');
+});
+
+test('group URL validation accepts HTTPS Facebook group URLs', () => {
+  assert.equal(Core.isSafeFacebookGroupUrl('https://www.facebook.com/groups/example'), true);
+  assert.equal(Core.isSafeFacebookGroupUrl('https://facebook.com/groups/123456/'), true);
+});
+
+test('group URL validation rejects non-Facebook, non-HTTPS, and non-group URLs', () => {
+  assert.equal(Core.isSafeFacebookGroupUrl('http://facebook.com/groups/example'), false);
+  assert.equal(Core.isSafeFacebookGroupUrl('https://evil.example/groups/example'), false);
+  assert.equal(Core.isSafeFacebookGroupUrl('https://facebook.com/profile.php?id=1'), false);
+  assert.equal(Core.isSafeFacebookGroupUrl('javascript:alert(1)'), false);
+  assert.equal(Core.isSafeFacebookGroupUrl('https://facebook.com.evil.example/groups/example'), false);
+});
+
+test('state validation rejects malformed and oversized imported data', () => {
+  assert.equal(Core.isValidState(null), false);
+  assert.equal(Core.isValidState([]), false);
+  const invalid = Core.createDefaultState();
+  invalid.groups = [{ id: 'g1', name: 'bad', url: 'https://example.com', selected: false }];
+  assert.equal(Core.isValidState(invalid), false);
+  const oversized = Core.createDefaultState();
+  oversized.logs = new Array(10001).fill({ at: 'now', message: 'x' });
+  assert.equal(Core.isValidState(oversized), false);
+});
+
+test('state validation accepts well-formed group, profile, task, log, and draft records', () => {
+  const state = Core.createDefaultState();
+  state.groups.push({ id: 'g1', name: 'Nhóm mẫu', url: 'https://www.facebook.com/groups/mau', selected: true });
+  state.profiles.push({ id: 'p1', name: 'Mặc định', provider: 'demo' });
+  state.tasks.push({ id: 't1', name: 'Nhắc xem bản nháp', time: '2026-10-24T09:00' });
+  state.logs.push({ at: '24/10/2026', message: 'Đã lưu nháp' });
+  state.drafts.push({ id: 'd1', text: 'Nội dung', url: '', createdAt: '2026-10-24T01:00:00.000Z' });
+  assert.equal(Core.isValidState(state), true);
+});
+
+test('CSV output quotes commas, quotes, and embedded newlines', () => {
+  assert.equal(Core.toCsv([['a', 'b'], ['x,y', 'say "hi"']]), '"a","b"\r\n"x,y","say ""hi"""');
+  assert.equal(Core.toCsv([['line1\nline2']]), '"line1\nline2"');
+});
+
+
+test('prompt placeholders are substituted without evaluating unknown names', () => {
+  assert.equal(Core.fillPrompt('For {groupName}: {postText}; {unknown}', {
+    groupName: 'Group A', postText: 'Hello'
+  }), 'For Group A: Hello; {unknown}');
+});
+
+test('CSV protects spreadsheet formulas', () => {
+  assert.equal(Core.toCsv([['=1+1', '+cmd', '-2', '@x']]), '"\'=1+1","\'+cmd","\'-2","\'@x"');
+});
+
+
+test('import validation rejects unknown providers and invalid reminder states', () => {
+  const badProvider = Core.createDefaultState();
+  badProvider.settings.provider = 'external-unknown';
+  assert.equal(Core.isValidState(badProvider), false);
+
+  const badProfile = Core.createDefaultState();
+  badProfile.profiles.push({ id: 'p1', name: 'Bad profile', provider: 'unknown' });
+  assert.equal(Core.isValidState(badProfile), false);
+
+  const badTask = Core.createDefaultState();
+  badTask.tasks.push({ id: 't1', name: 'Bad task', time: '2026-10-24T09:00', status: 'run-action' });
+  assert.equal(Core.isValidState(badTask), false);
+});
+
+
+test('group-targeted drafts accept valid Facebook URLs and reject unsafe targets', () => {
+  const state = Core.createDefaultState();
+  state.drafts.push({
+    id: 'd-group', text: 'Draft for group', url: '',
+    createdAt: '2026-10-24T01:00:00.000Z', kind: 'share',
+    targetGroupId: 'g1', targetGroupName: 'Nhóm mẫu',
+    targetGroupUrl: 'https://www.facebook.com/groups/mau'
+  });
+  assert.equal(Core.isValidState(state), true);
+
+  const unsafe = Core.createDefaultState();
+  unsafe.drafts.push({
+    id: 'd-bad', text: 'Bad target', url: '',
+    createdAt: '2026-10-24T01:00:00.000Z', kind: 'share',
+    targetGroupUrl: 'https://evil.example/groups/mau'
+  });
+  assert.equal(Core.isValidState(unsafe), false);
+});
+
+
+test('CSV parser handles quoted commas, quotes, CRLF, and embedded newlines', () => {
+  const csv = '"name","url","selected"\r\n"Group, A","https://www.facebook.com/groups/a","true"\r\n"Group ""B""","https://www.facebook.com/groups/b","false"';
+  assert.deepEqual(Core.parseCsv(csv), [
+    ['name', 'url', 'selected'],
+    ['Group, A', 'https://www.facebook.com/groups/a', 'true'],
+    ['Group "B"', 'https://www.facebook.com/groups/b', 'false']
+  ]);
+  assert.deepEqual(Core.parseCsv('"name","notes"\n"A","line one\nline two"'), [
+    ['name', 'notes'], ['A', 'line one\nline two']
+  ]);
+});
+
+test('CSV parser rejects malformed quoting and oversized input', () => {
+  assert.throws(() => Core.parseCsv('"not closed'), /chưa đóng/);
+  assert.throws(() => Core.parseCsv('a"b,c'), /không đúng vị trí/);
+  assert.throws(() => Core.parseCsv('x'.repeat(5000001)), /5 MB/);
+});
+
+
+test('legacy settings migrate prompt defaults and old reminders without losing groups', () => {
+  const legacy = Core.createDefaultState();
+  legacy.prompts = { share: 'Hello {groupName}' };
+  legacy.tasks.push({ id: 't-old', name: 'Old reminder', time: '2026-10-24T09:00' });
+  legacy.groups.push({ id: 'g-old', name: 'Old group', url: 'https://www.facebook.com/groups/old', selected: true });
+  const migrated = Core.migrateState(legacy);
+  assert.equal(migrated.groups[0].id, 'g-old');
+  assert.equal(migrated.tasks[0].status, 'scheduled');
+  assert.ok(migrated.prompts.general.includes('{content}'));
+  assert.equal(Core.isValidState(migrated), true);
+});
+
+test('CSV parser rejects characters after a closing quote', () => {
+  assert.throws(() => Core.parseCsv('"closed"x,value'), /sau dấu ngoặc kép đóng/);
+  assert.equal(Core.isSafeFacebookGroupUrl('https://evil.facebook.com/groups/example'), false);
+  assert.equal(Core.isSafeFacebookGroupUrl('https://facebook.com:444/groups/example'), false);
+});
+
+
+test('reminders can reference an existing or future draft identifier', () => {
+  const state = Core.createDefaultState();
+  state.tasks.push({ id: 't-linked', name: 'Review post', time: '2026-10-24T09:00', status: 'scheduled', draftId: 'draft-1' });
+  assert.equal(Core.isValidState(state), true);
+  state.tasks[0].draftId = 'x'.repeat(101);
+  assert.equal(Core.isValidState(state), false);
+});
+
+
+test('local Meta Page schedule records require valid Page IDs and timestamps', () => {
+  const state = Core.createDefaultState();
+  state.pageSchedules.push({
+    id: 'schedule-1', pageId: '12345678', message: 'Scheduled post', link: '',
+    scheduledAt: '2026-10-25T10:00:00.000Z', createdAt: '2026-10-24T10:00:00.000Z', status: 'scheduled'
+  });
+  assert.equal(Core.isValidState(state), true);
+  state.pageSchedules[0].pageId = 'not-a-page';
+  assert.equal(Core.isValidState(state), false);
+});
+
+
+test('manual engagement items require safe Facebook URLs and known statuses', () => {
+  const state = Core.createDefaultState();
+  state.engagementItems.push({
+    id: 'e1', name: 'Review post', url: 'https://www.facebook.com/posts/123',
+    kind: 'comment', note: 'Prepare a thoughtful reply', status: 'pending',
+    createdAt: '2026-10-24T10:00:00.000Z'
+  });
+  assert.equal(Core.isValidState(state), true);
+  state.engagementItems[0].url = 'https://evil.example/posts/123';
+  assert.equal(Core.isValidState(state), false);
+  assert.equal(Core.isSafeFacebookUrl('https://www.facebook.com/posts/123'), true);
+  assert.equal(Core.isSafeFacebookUrl('http://facebook.com/posts/123'), false);
+  assert.equal(Core.isSafeFacebookUrl('https://facebook.com.evil.example/posts/123'), false);
+});
+
+
+test('legacy demo provider migrates to Meta AI Web by default', () => {
+  const legacy = Core.createDefaultState();
+  legacy.settings.provider = 'demo';
+  const migrated = Core.migrateState(legacy);
+  assert.equal(migrated.settings.provider, 'meta');
+  assert.equal(Core.isValidState(migrated), true);
+});
+
+
+test('legacy drafts migrate into the review queue without losing content', () => {
+  const legacy = Core.createDefaultState();
+  legacy.drafts.push({
+    id: 'legacy-draft', text: 'A draft created before review statuses',
+    url: '', createdAt: '2026-10-24T10:00:00.000Z', kind: 'ai'
+  });
+  const migrated = Core.migrateState(legacy);
+  assert.equal(migrated.drafts[0].text, 'A draft created before review statuses');
+  assert.equal(migrated.drafts[0].reviewStatus, 'draft');
+  assert.equal(Core.isValidState(migrated), true);
+});
+
+test('draft review lifecycle accepts known states and rejects unknown states', () => {
+  const state = Core.createDefaultState();
+  state.drafts.push({
+    id: 'review-draft', text: 'Ready for approval', url: '',
+    createdAt: '2026-10-24T10:00:00.000Z', kind: 'ai',
+    reviewStatus: 'approved', approvedAt: '2026-10-24T10:01:00.000Z',
+    pageId: '12345678', postId: '12345678_98765432'
+  });
+  assert.equal(Core.isValidState(state), true);
+  state.drafts[0].reviewStatus = 'auto-publish';
+  assert.equal(Core.isValidState(state), false);
+});
+
+
+test('contact records validate Facebook URLs and known manual statuses', () => {
+  const state = Core.createDefaultState();
+  state.contacts.push({
+    id: 'c1', name: 'Potential contact',
+    url: 'https://www.facebook.com/profile.php?id=123456',
+    note: 'Shared professional interest', status: 'opened',
+    createdAt: '2026-10-24T10:00:00.000Z'
+  });
+  assert.equal(Core.isValidState(state), true);
+  state.contacts[0].status = 'auto-friend-request';
+  assert.equal(Core.isValidState(state), false);
+  state.contacts[0].status = 'connected';
+  state.contacts[0].url = 'https://evil.example/profile/123';
+  assert.equal(Core.isValidState(state), false);
+});
+
+
+test('draft source URLs remain distinct from external Page links', () => {
+  const state = Core.createDefaultState();
+  state.drafts.push({
+    id: 'source-link-draft', text: 'Post text', url: 'https://example.com/landing',
+    sourceUrl: 'https://www.facebook.com/posts/123',
+    createdAt: '2026-10-24T10:00:00.000Z', kind: 'ai', reviewStatus: 'published',
+    pageId: '12345678', postId: '12345678_98765432'
+  });
+  assert.equal(Core.isValidState(state), true);
+  state.drafts[0].sourceUrl = 'javascript:alert(1)';
+  assert.equal(Core.isValidState(state), false);
+});
+
+
+test('HTTPS URL validation permits public source links and rejects credentials or unsafe schemes', () => {
+  assert.equal(Core.isSafeHttpsUrl('https://example.com/article'), true);
+  assert.equal(Core.isSafeHttpsUrl('https://www.facebook.com/posts/123'), true);
+  assert.equal(Core.isSafeHttpsUrl('http://example.com/article'), false);
+  assert.equal(Core.isSafeHttpsUrl('javascript:alert(1)'), false);
+  assert.equal(Core.isSafeHttpsUrl('https://user:password@example.com/article'), false);
+  assert.equal(Core.isSafeHttpsUrl('https://'), false);
+});
+
+test('legacy group batch settings are clamped to safe bounds without losing saved data', () => {
+  const legacy = Core.createDefaultState();
+  legacy.settings.groupLimit = 500;
+  legacy.settings.delay = 300;
+  legacy.groups.push({ id: 'g-safe', name: 'Saved group', url: 'https://www.facebook.com/groups/safe', selected: true });
+  const migrated = Core.migrateState(legacy);
+  assert.equal(migrated.settings.groupLimit, 10);
+  assert.equal(migrated.settings.delay, 5);
+  assert.equal(migrated.groups[0].id, 'g-safe');
+  assert.equal(Core.isValidState(migrated), true);
+});
+
+
+test('legacy published Page drafts migrate their attachment link without losing source URLs', () => {
+  const legacy = Core.createDefaultState();
+  legacy.drafts.push({
+    id: 'published-legacy', text: 'Published post',
+    url: 'https://example.com/landing',
+    sourceUrl: 'https://www.facebook.com/posts/123',
+    createdAt: '2026-10-24T10:00:00.000Z', kind: 'ai',
+    reviewStatus: 'published', pageId: '12345678',
+    postId: '12345678_98765432'
+  });
+  const migrated = Core.migrateState(legacy);
+  assert.equal(migrated.drafts[0].pageLink, 'https://example.com/landing');
+  assert.equal(migrated.drafts[0].sourceUrl, 'https://www.facebook.com/posts/123');
+  assert.equal(Core.isValidState(migrated), true);
+});
+
+
+test('weekly report builder counts the current period, compares the prior period, and stays local', () => {
+  const state = Core.createDefaultState();
+  const now = Date.parse('2026-10-24T12:00:00.000Z');
+  state.observations.push(
+    { id: 'o1', sourceUrl: 'https://www.facebook.com/posts/1', capturedAt: '2026-10-23T12:00:00.000Z', text: 'Current observation one', contactId: 'c1', contactName: 'Alice' },
+    { id: 'o2', sourceUrl: 'https://www.facebook.com/posts/2', capturedAt: '2026-10-22T12:00:00.000Z', text: 'Current observation two', contactId: 'c1', contactName: 'Alice' },
+    { id: 'o3', sourceUrl: 'https://www.facebook.com/posts/3', capturedAt: '2026-10-15T12:00:00.000Z', text: 'Previous observation', contactId: 'c2', contactName: 'Bob' }
+  );
+  const report = Core.buildWeeklyReport(state, now);
+  assert.equal(report.observationsCount, 2);
+  assert.equal(report.profilesCount, 1);
+  assert.equal(report.previousObservationsCount, 1);
+  assert.match(report.summary, /Alice: 2/);
+  assert.match(report.summary, /tăng 1 quan sát/);
+  assert.equal(report.aiSummary, '');
+  state.weeklyReports.push(report);
+  assert.equal(Core.isValidState(state), true);
+});
+
+test('weekly report builder handles an empty observation period without inventing analysis', () => {
+  const report = Core.buildWeeklyReport(Core.createDefaultState(), Date.parse('2026-10-24T12:00:00.000Z'));
+  assert.equal(report.observationsCount, 0);
+  assert.equal(report.profilesCount, 0);
+  assert.match(report.summary, /chưa có quan sát nào/);
+});

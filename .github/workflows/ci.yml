@@ -1,0 +1,38 @@
+name: Extension CI
+
+on:
+  push:
+    branches:
+      - "**"
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    name: Test and package extension
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Check JavaScript syntax and Manifest V3
+        run: npm run validate
+      - name: Run unit tests
+        run: npm test
+      - name: Package extension ZIP
+        run: npm run package
+      - name: Upload installable extension
+        uses: actions/upload-artifact@v4
+        with:
+          name: facebook-ai-assistant-extension
+          path: dist/facebook-ai-assistant.zip
+          if-no-files-found: error
+          retention-days: 14

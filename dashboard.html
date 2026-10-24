@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>Facebook AI Assistant</title>
+  <link rel="stylesheet" href="src/styles.css">
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <span class="brandicon" aria-hidden="true">ϟ</span>
+      <strong>Trợ lý AI Facebook</strong>
+      <span class="tag">FULL · DEV 0.7.3</span>
+      <span class="tag green">Meta AI Web</span>
+    </div>
+    <div class="topactions">
+      <button id="exportBtn" type="button">Xuất cấu hình</button>
+      <button id="importBtn" type="button">Nhập cấu hình</button>
+      <input id="importFile" type="file" accept="application/json" hidden>
+      <input id="groupImportFile" type="file" accept=".csv,text/csv" hidden>
+      <button id="openHelp" type="button">Hướng dẫn</button>
+      <label class="font-size-control" for="fontSizeSelect">Cỡ chữ
+        <select id="fontSizeSelect" aria-label="Cỡ chữ giao diện">
+          <option value="1">100%</option>
+          <option value="1.1">110%</option>
+          <option value="1.2" selected>120%</option>
+          <option value="1.3">130%</option>
+          <option value="1.4">140%</option>
+        </select>
+      </label>
+      <span>Tiếng Việt</span>
+    </div>
+  </header>
+  <div class="shell">
+    <aside id="sidebar" aria-label="Điều hướng"></aside>
+    <main>
+      <div class="heading">
+        <div><h1 id="pageTitle">Quản lý nhóm</h1><p id="pageDesc">Quản lý danh sách và bản nháp.</p></div>
+        <span id="connectionStatus" class="status" role="status" aria-live="polite" title="Trạng thái Meta AI Web và Facebook Page được theo dõi riêng">● Chạy cục bộ · Meta AI Web chưa kiểm tra · Facebook Page API chưa cấu hình</span>
+      </div>
+      <div id="view"></div>
+    </main>
+  </div>
+  <div id="toast" role="status" aria-live="polite"></div>
+  <script src="src/core.js"></script>
+  <script src="src/ai-provider.js"></script>
+  <script src="src/facebook-provider.js"></script>
+  <script src="src/app.js"></script>
+</body>
+</html>

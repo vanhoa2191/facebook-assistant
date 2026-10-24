@@ -1,0 +1,466 @@
+'use strict';
+
+const test = require('node:test');
+const assert = require('node:assert/strict');
+const vm = require('node:vm');
+const fs = require('node:fs');
+const path = require('node:path');
+const Core = require('../src/core.js');
+const Gemini = require('../src/ai-provider.js');
+
+function loadApp(options) {
+  const settings = options || {};
+  const listeners = {};
+  const elements = {};
+  const openedTabs = [];
+  function makeElement(selector) {
+    return {
+      selector, innerHTML: '', textContent: '', value: '', style: {},
+      addEventListener(type, callback) { listeners[selector + ':' + type] = callback; },
+      click() { this.clicked = true; }
+    };
+  }
+  const rootStyle = { values: {}, setProperty(name, value) { this.values[name] = value; } };
+  const document = {
+    documentElement: { style: rootStyle },
+    querySelector(selector) {
+      if (!elements[selector]) elements[selector] = makeElement(selector);
+      return elements[selector];
+    },
+    addEventListener(type, callback) { listeners['document:' + type] = callback; }
+  };
+  const window = {
+    FAACore: Core,
+    FAAAI: Gemini,
+    FAAFacebook: settings.facebookProvider || {
+      publishPagePost: async options => ({
+        id: '12345678_98765432', pageId: options.pageId, version: options.version,
+        scheduled: Boolean(options.scheduledPublishAt), scheduledAt: options.scheduledPublishAt || null
+      })
+    },
+    confirm: () => true,
+    prompt: () => null
+  };
+  const chrome = {
+    storage: {
+      local: {
+        get: async () => settings.initialState ? { 'faa.state': settings.initialState } : {},
+        set: async () => ({})
+      },
+      session: {
+        get: async key => {
+          if (!settings.pageToken) return {};
+          const token = { 'faa.facebookPageToken': 'test-page-token-12345' };
+          if (Array.isArray(key)) return token;
+          return key === 'faa.facebookPageToken' ? token : {};
+        },
+        set: async () => ({}),
+        remove: async () => ({})
+      }
+    },
+    permissions: {
+      contains: async args => {
+        if (Array.isArray(args.permissions)) return args.permissions.includes('scripting') && (args.origins || []).some(origin => origin.includes('meta.ai'));
+        if ((args.origins || []).some(origin => origin.includes('graph.facebook.com'))) return Boolean(settings.graphPermission);
+        return false;
+      },
+      request: async args => {
+        if (Array.isArray(args.permissions) && args.permissions.includes('notifications')) return Boolean(settings.notificationsRequestGranted);
+        if ((args.origins || []).some(origin => origin.includes('facebook.com'))) return Boolean(settings.facebookCaptureGranted);
+        return false;
+      }
+    },
+    tabs: {
+      create: async options => { openedTabs.push(options); return { id: openedTabs.length }; },
+      query: async args => (args && Array.isArray(args.url) && args.url.some(url => url.includes('facebook.com'))
+        ? (settings.facebookTabs || [])
+        : [{ id: 7, url: 'https://www.meta.ai/', status: 'complete' }]),
+      sendMessage: async (tabId, message) => message && message.type === 'FAA_CAPTURE_VISIBLE_FACEBOOK_POST'
+        ? (settings.facebookCaptureResponse || { ok: true, sourceUrl: 'https://www.facebook.com/posts/123', text: 'A visible post with a comment and reply.', visibleArticleCount: 2, capturedAt: new Date().toISOString() })
+        : ({ ok: true, text: 'Bản nháp Meta AI đã được tạo thành công.' })
+    },
+    scripting: { executeScript: async () => [{}] }
+  };
+  const context = { window, document, chrome, crypto, setTimeout, clearTimeout, Date, URL, Blob, navigator: { clipboard: { writeText: async () => {} } } };
+  const appPath = path.join(__dirname, '..', 'src', 'app.js');
+  vm.runInNewContext(fs.readFileSync(appPath, 'utf8'), context, { filename: 'src/app.js' });
+  return { elements, listeners, openedTabs };
+}
+
+test('dashboard initializes and renders all 13 navigation modules', async () => {
+  const { elements } = loadApp();
+  await new Promise(resolve => setTimeout(resolve, 10));
+  const sidebar = elements['#sidebar'].innerHTML;
+  assert.equal((sidebar.match(/data-nav=/g) || []).length, 14);
+  assert.equal(elements['#pageTitle'].textContent, 'Quản lý nhóm và tương tác');
+  assert.match(elements['#view'].innerHTML, /Thêm nhóm/);
+  assert.match(elements['#view'].innerHTML, /Theo dõi tương tác/);
+  assert.match(elements['#view'].innerHTML, /addEngagement/);
+});
+
+test('header distinguishes Meta AI Web status from Facebook Page API setup', async () => {
+  const { elements, listeners } = loadApp();
+  await new Promise(resolve => setTimeout(resolve, 10));
+  assert.match(elements['#connectionStatus'].textContent, /Meta AI Web đã cấp quyền/);
+  assert.match(elements['#connectionStatus'].textContent, /Facebook Page API chưa cấu hình/);
+  assert.doesNotMatch(elements['#connectionStatus'].textContent, /chưa kết nối Facebook/);
+
+  listeners['document:click']({ target: { closest(selector) {
+    return selector === '[data-nav]' ? { dataset: { nav: 'ai' } } : null;
+  } } });
+  elements['#metaWebPrompt'] = { value: 'Hãy biên tập nội dung sau: {content}' };
+  elements['#metaWebInput'] = { value: 'Viết lời giới thiệu ngắn.' };
+  listeners['document:click']({ target: { closest(selector) {
+    return selector === '[data-action]' ? { dataset: { action: 'generateMetaWebDraft' } } : null;
+  } } });
+  await new Promise(resolve => setTimeout(resolve, 30));
+  assert.match(elements['#connectionStatus'].textContent, /Meta AI Web hoạt động/);
+  assert.match(elements['#connectionStatus'].textContent, /Facebook Page API chưa cấu hình/);
+  assert.match(elements['#view'].innerHTML, /Đã nhận câu trả lời và lưu thành bản nháp/);
+});
+
+test('navigation opens the AI and sales modules without runtime errors', async () => {
+  const { elements, listeners } = loadApp();
+  await new Promise(resolve => setTimeout(resolve, 10));
+  const click = listeners['document:click'];
+  click({ target: { closest(selector) {
+    return selector === '[data-nav]' ? { dataset: { nav: 'connect' } } : null;
+  } } });
+  assert.equal(elements['#pageTitle'].textContent, 'Kết bạn');
+  assert.match(elements['#view'].innerHTML, /contactUrl/);
+  assert.match(elements['#view'].innerHTML, /không tự gửi lời mời kết bạn/i);
+
+  click({ target: { closest(selector) {
+    return selector === '[data-nav]' ? { dataset: { nav: 'ai' } } : null;
+  } } });
+  assert.equal(elements['#pageTitle'].textContent, 'Hồ sơ AI dùng chung');
+  assert.match(elements['#view'].innerHTML, /Cấp quyền Gemini API/);
+  assert.match(elements['#view'].innerHTML, /Cấp quyền và mở Meta AI/);
+  assert.match(elements['#view'].innerHTML, /Gửi sang Meta AI Web và lưu nháp/);
+
+  click({ target: { closest(selector) {
+    return selector === '[data-nav]' ? { dataset: { nav: 'sales' } } : null;
+  } } });
+  assert.equal(elements['#pageTitle'].textContent, 'Đăng bán');
+  assert.match(elements['#view'].innerHTML, /Thông tin sản phẩm/);
+
+  click({ target: { closest(selector) {
+    return selector === '[data-nav]' ? { dataset: { nav: 'pages' } } : null;
+  } } });
+  assert.equal(elements['#pageTitle'].textContent, 'Nuôi Page');
+  assert.match(elements['#view'].innerHTML, /Page access token/);
+  assert.match(elements['#view'].innerHTML, /Đăng ngay \/ lên lịch trên Page/);
+  assert.match(elements['#view'].innerHTML, /pagePublishTime/);
+  assert.match(elements['#view'].innerHTML, /Lưu chỉnh sửa thành nháp/);
+
+  click({ target: { closest(selector) {
+    return selector === '[data-nav]' ? { dataset: { nav: 'share' } } : null;
+  } } });
+  assert.match(elements['#view'].innerHTML, /shareExternalOutput/);
+  assert.match(elements['#view'].innerHTML, /Sao chép prompt/);
+
+  click({ target: { closest(selector) {
+    return selector === '[data-nav]' ? { dataset: { nav: 'learn' } } : null;
+  } } });
+  assert.match(elements['#view'].innerHTML, /moduleOutput/);
+  assert.match(elements['#view'].innerHTML, /Lưu kết quả AI thành nháp/);
+
+  click({ target: { closest(selector) {
+    return selector === '[data-nav]' ? { dataset: { nav: 'schedule' } } : null;
+  } } });
+  assert.equal(elements['#pageTitle'].textContent, 'Lịch chạy');
+  assert.match(elements['#view'].innerHTML, /taskDraftId/);
+  assert.match(elements['#view'].innerHTML, /Lịch đăng Facebook Page/);
+
+  click({ target: { closest(selector) {
+    return selector === '[data-nav]' ? { dataset: { nav: 'review' } } : null;
+  } } });
+  assert.equal(elements['#pageTitle'].textContent, 'Hàng đợi duyệt bài');
+  assert.match(elements['#view'].innerHTML, /AI chỉ tạo bản nháp/);
+  assert.match(elements['#view'].innerHTML, /reviewStatusFilter/);
+});
+
+
+test('Meta AI draft moves through review queue and saves edits without publishing', async () => {
+  const { elements, listeners } = loadApp();
+  await new Promise(resolve => setTimeout(resolve, 10));
+  const clickNav = nav => listeners['document:click']({ target: { closest(selector) {
+    return selector === '[data-nav]' ? { dataset: { nav } } : null;
+  } } });
+  const clickAction = (action, id) => listeners['document:click']({ target: { closest(selector) {
+    return selector === '[data-action]' ? { dataset: { action, id } } : null;
+  } } });
+
+  clickNav('scrape');
+  elements['#moduleInput'] = { value: 'Tóm tắt nội dung bài viết tôi cung cấp.' };
+  elements['#modulePrompt'] = { value: 'Tóm tắt ngắn gọn: {content}' };
+  elements['#moduleSourceUrl'] = { value: 'https://www.facebook.com/posts/123' };
+  clickAction('generateModuleDraft');
+  await new Promise(resolve => setTimeout(resolve, 30));
+
+  // Generated module drafts are shown in the dedicated review queue, not in the scrape view.
+  clickNav('review');
+  await new Promise(resolve => setTimeout(resolve, 10));
+  assert.match(elements['#view'].innerHTML, /Mở liên kết/);
+  assert.match(elements['#view'].innerHTML, /Chờ duyệt/);
+  const match = elements['#view'].innerHTML.match(/data-action="reviewDraft" data-id="([^"]+)"/);
+  assert.ok(match, 'generated draft should have a review action');
+  const draftId = match[1];
+
+  clickAction('reviewDraft', draftId);
+  await new Promise(resolve => setTimeout(resolve, 10));
+  assert.equal(elements['#pageTitle'].textContent, 'Nuôi Page');
+  assert.match(elements['#view'].innerHTML, /Bản nháp đã được duyệt sơ bộ/);
+  assert.match(elements['#view'].innerHTML, /Lưu chỉnh sửa thành nháp/);
+  assert.match(elements['#view'].innerHTML, /id="pageLink" type="text" value=""/);
+
+  elements['#pageMessage'] = { value: 'Nội dung đã được người dùng chỉnh sửa.' };
+  elements['#pageLink'] = { value: 'https://example.com/landing' };
+  clickAction('savePageDraft');
+  await new Promise(resolve => setTimeout(resolve, 10));
+  assert.match(elements['#toast'].textContent, /Đã lưu bản nháp/);
+
+  assert.match(elements['#view'].innerHTML, /id="pageLink" type="text" value="https:\/\/example.com\/landing"/);
+  clickNav('review');
+  assert.match(elements['#view'].innerHTML, /Nội dung đã được người dùng chỉnh sửa/);
+  assert.match(elements['#view'].innerHTML, /Chờ duyệt/);
+  assert.match(elements['#view'].innerHTML, /Mở liên kết/);
+  const savedDraft = elements['#view'].innerHTML.match(/data-action="reviewDraft" data-id="([^"]+)"/);
+  assert.ok(savedDraft);
+  clickAction('reviewDraft', savedDraft[1]);
+  await new Promise(resolve => setTimeout(resolve, 10));
+  assert.match(elements['#view'].innerHTML, /id="pageLink" type="text" value="https:\/\/example.com\/landing"/);
+});
+
+
+test('confirmed Page publishing records the result in the review queue', async () => {
+  const { elements, listeners } = loadApp({ graphPermission: true, pageToken: true });
+  await new Promise(resolve => setTimeout(resolve, 10));
+  const clickNav = nav => listeners['document:click']({ target: { closest(selector) {
+    return selector === '[data-nav]' ? { dataset: { nav } } : null;
+  } } });
+  const clickAction = (action, id) => listeners['document:click']({ target: { closest(selector) {
+    return selector === '[data-action]' ? { dataset: { action, id } } : null;
+  } } });
+
+  clickNav('pages');
+  elements['#pageId'] = { value: '12345678' };
+  elements['#graphVersion'] = { value: 'v26.0' };
+  elements['#pageMessage'] = { value: 'A reviewed Page post.' };
+  elements['#pageLink'] = { value: '' };
+  elements['#pagePublishTime'] = { value: '' };
+  clickAction('publishPagePost');
+  await new Promise(resolve => setTimeout(resolve, 30));
+  assert.match(elements['#view'].innerHTML, /Đăng thành công/);
+  assert.match(elements['#view'].innerHTML, /12345678_98765432/);
+
+  clickNav('review');
+  clickAction('clearReviewFilter');
+  assert.match(elements['#view'].innerHTML, /Đã đăng/);
+  assert.match(elements['#view'].innerHTML, /12345678_98765432/);
+});
+
+
+test('connect module can generate a reviewed invitation draft with its source URL', async () => {
+  const { elements, listeners } = loadApp();
+  await new Promise(resolve => setTimeout(resolve, 10));
+  const clickNav = nav => listeners['document:click']({ target: { closest(selector) {
+    return selector === '[data-nav]' ? { dataset: { nav } } : null;
+  } } });
+  const clickAction = action => listeners['document:click']({ target: { closest(selector) {
+    return selector === '[data-action]' ? { dataset: { action } } : null;
+  } } });
+
+  clickNav('connect');
+  assert.match(elements['#view'].innerHTML, /Soạn lời mời bằng Meta AI Web/);
+  elements['#moduleInput'] = { value: 'Người nhận viết về giáo dục tiểu học; tôi muốn kết nối để trao đổi kinh nghiệm.' };
+  elements['#modulePrompt'] = { value: 'Viết lời mời ngắn, không bịa quan hệ: {content}' };
+  elements['#moduleSourceUrl'] = { value: 'https://www.facebook.com/profile.php?id=123456' };
+  clickAction('generateModuleDraft');
+  await new Promise(resolve => setTimeout(resolve, 30));
+
+  assert.match(elements['#view'].innerHTML, /Chờ duyệt/);
+  assert.match(elements['#view'].innerHTML, /Mở liên kết/);
+  assert.match(elements['#view'].innerHTML, /Bản nháp Meta AI đã được tạo thành công/);
+  assert.match(elements['#view'].innerHTML, /không gửi lời mời/i);
+});
+
+test('opening selected groups respects the configured batch limit', async () => {
+  const initialState = Core.createDefaultState();
+  initialState.settings.groupLimit = 2;
+  initialState.settings.delay = 0;
+  initialState.groups = [
+    { id: 'g1', name: 'Group One', url: 'https://www.facebook.com/groups/one', selected: true },
+    { id: 'g2', name: 'Group Two', url: 'https://www.facebook.com/groups/two', selected: true },
+    { id: 'g3', name: 'Group Three', url: 'https://www.facebook.com/groups/three', selected: true }
+  ];
+  const { elements, listeners, openedTabs } = loadApp({ initialState });
+  await new Promise(resolve => setTimeout(resolve, 10));
+  const clickNav = nav => listeners['document:click']({ target: { closest(selector) {
+    return selector === '[data-nav]' ? { dataset: { nav } } : null;
+  } } });
+  const clickAction = action => listeners['document:click']({ target: { closest(selector) {
+    return selector === '[data-action]' ? { dataset: { action } } : null;
+  } } });
+
+  clickNav('groups');
+  clickAction('openSelectedGroups');
+  await new Promise(resolve => setTimeout(resolve, 20));
+  assert.equal(openedTabs.length, 2);
+  assert.equal(openedTabs[0].url, 'https://www.facebook.com/groups/one');
+  assert.equal(openedTabs[1].url, 'https://www.facebook.com/groups/two');
+  assert.match(elements['#toast'].textContent, /Đã mở 2 tab nhóm/);
+});
+
+
+test('notification permission is requested explicitly from the reminders module', async () => {
+  const { elements, listeners } = loadApp({ notificationsRequestGranted: true });
+  await new Promise(resolve => setTimeout(resolve, 10));
+  const clickNav = nav => listeners['document:click']({ target: { closest(selector) {
+    return selector === '[data-nav]' ? { dataset: { nav } } : null;
+  } } });
+  const clickAction = action => listeners['document:click']({ target: { closest(selector) {
+    return selector === '[data-action]' ? { dataset: { action } } : null;
+  } } });
+  clickNav('schedule');
+  assert.match(elements['#view'].innerHTML, /Chưa cấp quyền thông báo/);
+  clickAction('requestNotificationPermission');
+  await new Promise(resolve => setTimeout(resolve, 10));
+  assert.match(elements['#view'].innerHTML, /Đã bật thông báo trên máy/);
+  assert.match(elements['#toast'].textContent, /Đã bật thông báo/);
+});
+
+test('reminder creation rejects a date in the past', async () => {
+  const { elements, listeners } = loadApp();
+  await new Promise(resolve => setTimeout(resolve, 10));
+  const clickNav = nav => listeners['document:click']({ target: { closest(selector) {
+    return selector === '[data-nav]' ? { dataset: { nav } } : null;
+  } } });
+  const clickAction = action => listeners['document:click']({ target: { closest(selector) {
+    return selector === '[data-action]' ? { dataset: { action } } : null;
+  } } });
+  clickNav('schedule');
+  elements['#taskName'] = { value: 'Past reminder' };
+  elements['#taskTime'] = { value: new Date(Date.now() - 60000).toISOString().slice(0, 16) };
+  clickAction('addTask');
+  await new Promise(resolve => setTimeout(resolve, 10));
+  assert.match(elements['#toast'].textContent, /ở trong tương lai/);
+});
+
+
+test('capture current visible Facebook post and comments into a locally assigned profile observation', async () => {
+  const initialState = Core.createDefaultState();
+  initialState.contacts.push({
+    id: 'contact-1', name: 'Alice Example',
+    url: 'https://www.facebook.com/profile.php?id=123456',
+    note: 'Shared teaching interests', status: 'opened',
+    createdAt: '2026-10-24T01:00:00.000Z'
+  });
+  const { elements, listeners } = loadApp({
+    initialState,
+    facebookCaptureGranted: true,
+    facebookTabs: [{ id: 12, url: 'https://www.facebook.com/groups/123/posts/456', status: 'complete', lastAccessed: 100 }],
+    facebookCaptureResponse: {
+      ok: true, sourceUrl: 'https://www.facebook.com/groups/123/posts/456',
+      text: 'Bài viết đang hiển thị\\nBình luận thứ nhất\\nPhản hồi lồng nhau',
+      visibleArticleCount: 3, capturedAt: '2026-10-24T02:00:00.000Z'
+    }
+  });
+  await new Promise(resolve => setTimeout(resolve, 10));
+  const clickNav = nav => listeners['document:click']({ target: { closest(selector) {
+    return selector === '[data-nav]' ? { dataset: { nav } } : null;
+  } } });
+  const clickAction = (action, id) => listeners['document:click']({ target: { closest(selector) {
+    return selector === '[data-action]' ? { dataset: { action, id } } : null;
+  } } });
+
+  clickNav('scrape');
+  elements['#observationContactId'] = { value: 'contact-1' };
+  clickAction('captureCurrentFacebookPost');
+  await new Promise(resolve => setTimeout(resolve, 30));
+  assert.match(elements['#view'].innerHTML, /Alice Example/);
+  assert.match(elements['#view'].innerHTML, /Bình luận thứ nhất/);
+  assert.match(elements['#view'].innerHTML, /Phản hồi lồng nhau/);
+  // The saved observation is reflected in the history count; success feedback is a toast.
+  assert.match(elements['#view'].innerHTML, /1 quan sát đã lưu/);
+  assert.match(elements['#view'].innerHTML, /Mở nguồn/);
+
+  const observation = elements['#view'].innerHTML.match(/data-action="analyzeObservation" data-id="([^"]+)"/);
+  assert.ok(observation, 'captured observation should expose an AI analysis action');
+  clickAction('analyzeObservation', observation[1]);
+  await new Promise(resolve => setTimeout(resolve, 40));
+  assert.match(elements['#view'].innerHTML, /Phân tích AI/);
+  assert.match(elements['#view'].innerHTML, /Bản nháp Meta AI đã được tạo thành công/);
+});
+
+test('analytics module exposes local weekly report and Excel-compatible CSV export', async () => {
+  const { elements, listeners } = loadApp();
+  await new Promise(resolve => setTimeout(resolve, 10));
+  listeners['document:click']({ target: { closest(selector) {
+    return selector === '[data-nav]' ? { dataset: { nav: 'analytics' } } : null;
+  } } });
+  assert.equal(elements['#pageTitle'].textContent, 'Phân tích & báo cáo');
+  assert.match(elements['#view'].innerHTML, /Tổng hợp ngay bằng AI/);
+  assert.match(elements['#view'].innerHTML, /Xuất báo cáo CSV \(Excel\)/);
+  assert.match(elements['#view'].innerHTML, /Báo cáo 7 ngày/);
+});
+
+
+test('CSV import never merges two distinct Facebook IDs merely because names match', async () => {
+  const initialState = Core.createDefaultState();
+  initialState.contacts.push({
+    id: 'existing-111', name: 'Nguyen Van A',
+    url: 'https://www.facebook.com/profile.php?id=111',
+    facebookId: '111', status: 'connected',
+    note: 'Keep existing identity', createdAt: '2026-10-20T00:00:00.000Z'
+  });
+  const { elements, listeners } = loadApp({ initialState });
+  await new Promise(resolve => setTimeout(resolve, 10));
+  const csv = 'name,url,facebook id\nNguyen Van A,https://www.facebook.com/profile.php?id=222,222';
+  const file = { size: csv.length, text: async () => csv };
+  await listeners['document:change']({ target: { id: 'contactImportFile', files: [file], value: 'contacts.csv' } });
+  await new Promise(resolve => setTimeout(resolve, 10));
+  listeners['document:click']({ target: { closest(selector) {
+    return selector === '[data-nav]' ? { dataset: { nav: 'connect' } } : null;
+  } } });
+  const html = elements['#view'].innerHTML;
+  assert.match(html, /existing-111/);
+  assert.match(html, /profile\.php\?id=111/);
+  assert.match(html, /profile\.php\?id=222/);
+  assert.match(html, /Đã kết nối/);
+  assert.match(elements['#toast'].textContent, /thêm 1, cập nhật 0, bỏ qua 0/);
+});
+
+test('rebuilding a weekly report in the dashboard preserves its saved AI summary', async () => {
+  const initialState = Core.createDefaultState();
+  const now = Date.now();
+  const report = Core.buildWeeklyReport(initialState, now);
+  report.aiSummary = 'Tóm tắt AI đã được lưu trước đó.';
+  report.aiSummaryAt = new Date(now - 1000).toISOString();
+  initialState.weeklyReports.push(report);
+  const { elements, listeners } = loadApp({ initialState });
+  await new Promise(resolve => setTimeout(resolve, 10));
+  const clickNav = nav => listeners['document:click']({ target: { closest(selector) {
+    return selector === '[data-nav]' ? { dataset: { nav: 'analytics' } } : null;
+  } } });
+  const clickAction = action => listeners['document:click']({ target: { closest(selector) {
+    return selector === '[data-action]' ? { dataset: { action } } : null;
+  } } });
+  clickNav('analytics');
+  clickAction('createWeeklyReportNow');
+  await new Promise(resolve => setTimeout(resolve, 15));
+  assert.match(elements['#view'].innerHTML, /Tóm tắt AI đã được lưu trước đó/);
+  assert.match(elements['#toast'].textContent, /Đã tạo báo cáo thống kê cục bộ/);
+});
+
+
+test('font size selector enlarges the dashboard and persists the chosen scale', async () => {
+  const { elements, listeners } = loadApp();
+  await new Promise(resolve => setTimeout(resolve, 10));
+  const select = elements['#fontSizeSelect'];
+  assert.equal(select.value, '1.2');
+  await listeners['document:change']({ target: { id: 'fontSizeSelect', value: '1.4' } });
+  await new Promise(resolve => setTimeout(resolve, 10));
+  assert.equal(select.value, '1.4');
+  assert.equal(elements['#toast'].textContent, 'Đã lưu cỡ chữ 140%.');
+});

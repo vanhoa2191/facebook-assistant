@@ -196,6 +196,9 @@ test('Meta AI draft moves through review queue and saves edits without publishin
   clickAction('generateModuleDraft');
   await new Promise(resolve => setTimeout(resolve, 30));
 
+  // Generated module drafts are shown in the dedicated review queue, not in the scrape view.
+  clickNav('review');
+  await new Promise(resolve => setTimeout(resolve, 10));
   assert.match(elements['#view'].innerHTML, /Mở liên kết/);
   assert.match(elements['#view'].innerHTML, /Chờ duyệt/);
   const match = elements['#view'].innerHTML.match(/data-action="reviewDraft" data-id="([^"]+)"/);
@@ -376,7 +379,8 @@ test('capture current visible Facebook post and comments into a locally assigned
   assert.match(elements['#view'].innerHTML, /Alice Example/);
   assert.match(elements['#view'].innerHTML, /Bình luận thứ nhất/);
   assert.match(elements['#view'].innerHTML, /Phản hồi lồng nhau/);
-  assert.match(elements['#view'].innerHTML, /Đã lưu quan sát/);
+  // The saved observation is reflected in the history count; success feedback is a toast.
+  assert.match(elements['#view'].innerHTML, /1 quan sát đã lưu/);
   assert.match(elements['#view'].innerHTML, /Mở nguồn/);
 
   const observation = elements['#view'].innerHTML.match(/data-action="analyzeObservation" data-id="([^"]+)"/);

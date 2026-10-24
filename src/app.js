@@ -1371,6 +1371,182 @@
         log('Đã lưu nhắc việc: ' + nameValue);
         break;
       }
+      case 'captureCurrentFacebookPost': {
+        const granted = await chrome.permissions.request({ permissions: ['scripting'], origins: FACEBOOK_CAPTURE_ORIGINS });
+        if (!granted) { toast('Chưa cấp quyền đọc bài viết Facebook đang mở.'); return; }
+        let tabs = [];
+        try { tabs = await chrome.tabs.query({ url: FACEBOOK_CAPTURE_ORIGINS }); } catch (_) {}
+        const tab = tabs.filter(item => item && item.id != null && Core.isSafeFacebookUrl(item.url))
+          .sort((a, b) => Number(b.lastAccessed || 0) - Number(a.lastAccessed || 0))[0];
+        if (!tab) { toast('Hãy mở một bài viết Facebook riêng trong tab khác rồi thử lại.'); return; }
+        try {
+          if (tab.status && tab.status !== 'complete') await waitForTabReady(tab.id, 45000, 'Facebook');
+          await chrome.scripting.executeScript({ target: { tabId: tab.id }, files: ['src/facebook-page-bridge.js'] });
+          const result = await chrome.tabs.sendMessage(tab.id, { type: 'FAA_CAPTURE_VISIBLE_FACEBOOK_POST' });
+          if (!result || !result.ok) { toast(result && result.error ? result.error : 'Không đọc được bài viết đang hiển thị.'); return; }
+          if (!Core.isSafeFacebookUrl(result.sourceUrl) || !result.text || result.text.length < 20) {
+            toast('Dữ liệu trả về không hợp lệ; chưa lưu quan sát.');
+            return;
+          }
+          const contactId = $('#observationContactId') ? $('#observationContactId').value : '';
+          const contact = (state.contacts || []).find(item => item.id === contactId);
+          const observation = {
+            id: crypto.randomUUID(),
+            sourceUrl: result.sourceUrl,
+            capturedAt: result.capturedAt && Number.isFinite(Date.parse(result.capturedAt)) ? result.capturedAt : new Date().toISOString(),
+            text: String(result.text).slice(0, 50000),
+            visibleArticleCount: Number.isInteger(result.visibleArticleCount) ? Math.max(0, Math.min(100, result.visibleArticleCount)) : 0,
+            ...(contact ? { contactId: contact.id, contactName: contact.name } : {})
+          };
+          state.observations = Array.isArray(state.observations) ? state.observations : [];
+          state.observations.push(observation);
+          if (state.observations.length > 1000) state.observations.shift();
+          const sourceDraft = addDraft(observation.text.slice(0, 20000), '', 'source');
+          sourceDraft.sourceUrl = observation.sourceUrl;
+          log('Đã thu thập nội dung bài viết/bình luận đang hiển thị: ' + observation.sourceUrl);
+          await save();
+          render();
+          toast('Đã lưu quan sát và bản nháp nguồn. Chưa gửi dữ liệu cho AI.');
+        } catch (error) {
+          log('Thu thập bài Facebook thất bại: ' + error.message);
+          toast(error.message || 'Không thể thu thập bài viết đang mở.');
+        }
+        return;
+      }
+      case 'analyzeObservation': {
+        const observation = (state.observations || []).find(item => item.id === id);
+        if (!observation) { toast('Không tìm thấy quan sát.'); return; }
+        const content = 'Thời điểm thu thập: ' + observation.capturedAt +
+          '\nHồ sơ được gán: ' + (observation.contactName || 'Chưa gán hồ sơ') +
+          '\nNguồn: ' + observation.sourceUrl +
+          '\nNội dung đang hiển thị:\n' + observation.text.slice(0, 18000);
+        const prompt = Core.fillPrompt(state.prompts.profileAnalysis, { content });
+        try {
+          const output = state.settings.provider === 'gemini'
+            ? await geminiRequest(prompt)
+            : await generateWithMetaAiWeb(prompt);
+          if (!output) return;
+          observation.analysisText = output.slice(0, 20000);
+          observation.analysisAt = new Date().toISOString();
+          const analysisDraft = addDraft(observation.analysisText, '', 'ai');
+          analysisDraft.sourceUrl = observation.sourceUrl;
+          log('Đã phân tích quan sát theo ngữ cảnh: ' + observation.id);
+          if (state.settings.provider !== 'gemini') metaWebLastSuccess = true;
+          await save();
+          render();
+          toast('Đã lưu phân tích AI. Hãy kiểm tra nhận định trước khi sử dụng.');
+        } catch (error) {
+          log('Phân tích quan sát thất bại: ' + error.message);
+          await save();
+          toast(error.message || 'Không thể phân tích quan sát.');
+        }
+        return;
+      }
+      case 'openObservationSource': {
+        const observation = (state.observations || []).find(item => item.id === id);
+        if (!observation || !Core.isSafeFacebookUrl(observation.sourceUrl)) { toast('Không tìm thấy nguồn Facebook hợp lệ.'); return; }
+        await chrome.tabs.create({ url: observation.sourceUrl });
+        return;
+      }
+      case 'deleteObservation': {
+        const observation = (state.observations || []).find(item => item.id === id);
+        if (!observation) { toast('Không tìm thấy quan sát.'); return; }
+        if (!window.confirm('Xóa quan sát và nội dung phân tích đã lưu cục bộ?')) return;
+        state.observations = state.observations.filter(item => item.id !== id);
+        log('Đã xóa quan sát cục bộ: ' + id);
+        break;
+      }
+      case 'createWeeklyReportNow': {
+        const report = Core.buildWeeklyReport(state, Date.now());
+        upsertWeeklyReport(report);
+        log('Đã tổng hợp báo cáo thống kê 7 ngày.');
+        await save();
+        render();
+        toast('Đã tạo báo cáo thống kê cục bộ.');
+        return;
+      }
+      case 'summarizeNow':
+      case 'generateWeeklyAiSummary': {
+        let report = name === 'summarizeNow'
+          ? Core.buildWeeklyReport(state, Date.now())
+          : (state.weeklyReports || []).find(item => item.id === id);
+        if (!report) { toast('Không tìm thấy báo cáo.'); return; }
+        upsertWeeklyReport(report);
+        if (!report.observationsCount) {
+          await save();
+          render();
+          toast('Báo cáo đã lưu nhưng chưa có quan sát trong 7 ngày để tóm tắt bằng AI.');
+          return;
+        }
+        try {
+          const prompt = weeklyAiPrompt(report);
+          const output = state.settings.provider === 'gemini'
+            ? await geminiRequest(prompt)
+            : await generateWithMetaAiWeb(prompt);
+          if (!output) return;
+          report.aiSummary = output.slice(0, 20000);
+          report.aiSummaryAt = new Date().toISOString();
+          const reportDraft = addDraft(report.aiSummary, '', 'ai');
+          log('Đã tạo tóm tắt AI cho báo cáo 7 ngày: ' + report.id);
+          if (state.settings.provider !== 'gemini') metaWebLastSuccess = true;
+          await save();
+          render();
+          toast('Đã tạo tóm tắt AI. Hãy kiểm tra nội dung và nguồn trước khi chia sẻ.');
+        } catch (error) {
+          log('Tạo tóm tắt AI thất bại: ' + error.message);
+          await save();
+          render();
+          toast(error.message || 'Không thể tạo tóm tắt AI.');
+        }
+        return;
+      }
+      case 'exportObservationsCsv': {
+        const rows = [['Thời gian thu thập', 'Hồ sơ', 'Nguồn URL', 'Số khối bài/bình luận hiển thị', 'Nội dung', 'Phân tích AI']];
+        for (const item of state.observations || []) rows.push([
+          item.capturedAt, item.contactName || 'Chưa gán hồ sơ', item.sourceUrl,
+          item.visibleArticleCount || 0, item.text, item.analysisText || ''
+        ]);
+        download('facebook-ai-observations.csv', '\ufeff' + Core.toCsv(rows), 'text/csv;charset=utf-8');
+        toast('Đã xuất lịch sử quan sát CSV để mở bằng Excel.');
+        return;
+      }
+      case 'exportWeeklyReportsCsv': {
+        const rows = [['Bắt đầu kỳ', 'Kết thúc kỳ', 'Ngày tạo', 'Số quan sát', 'Số hồ sơ', 'So sánh kỳ trước', 'Báo cáo thống kê', 'Tóm tắt AI']];
+        for (const report of state.weeklyReports || []) rows.push([
+          report.periodStart, report.periodEnd, report.createdAt, report.observationsCount,
+          report.profilesCount, report.previousObservationsCount, report.summary, report.aiSummary || ''
+        ]);
+        download('facebook-ai-weekly-reports.csv', '\ufeff' + Core.toCsv(rows), 'text/csv;charset=utf-8');
+        toast('Đã xuất báo cáo CSV để mở bằng Excel.');
+        return;
+      }
+      case 'exportWeeklyReport': {
+        const report = (state.weeklyReports || []).find(item => item.id === id);
+        if (!report) { toast('Không tìm thấy báo cáo.'); return; }
+        const start = Date.parse(report.periodStart);
+        const end = Date.parse(report.periodEnd);
+        const rows = [
+          ['Loại', 'Thời gian', 'Hồ sơ', 'Nguồn URL', 'Số khối hiển thị', 'Nội dung'],
+          ['Báo cáo thống kê', report.createdAt, '', '', report.observationsCount, report.summary],
+          ['Tóm tắt AI', report.aiSummaryAt || '', '', '', '', report.aiSummary || '']
+        ];
+        for (const item of state.observations || []) {
+          const time = Date.parse(item.capturedAt);
+          if (Number.isFinite(time) && time >= start && time <= end) rows.push([
+            'Quan sát', item.capturedAt, item.contactName || 'Chưa gán hồ sơ',
+            item.sourceUrl, item.visibleArticleCount || 0, item.text
+          ]);
+        }
+        download('facebook-ai-weekly-report.csv', '\ufeff' + Core.toCsv(rows), 'text/csv;charset=utf-8');
+        toast('Đã xuất báo cáo và dữ liệu nguồn CSV.');
+        return;
+      }
+      case 'deleteWeeklyReport': {
+        if (!window.confirm('Xóa báo cáo này khỏi lịch sử cục bộ?')) return;
+        state.weeklyReports = (state.weeklyReports || []).filter(item => item.id !== id);
+        log('Đã xóa báo cáo tuần cục bộ: ' + id);
+        break;
+      }
       case 'generateModuleDraft': {
         const input = $('#moduleInput').value.trim();
         const template = $('#modulePrompt').value.trim();

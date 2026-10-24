@@ -242,3 +242,25 @@ test('draft source URLs remain distinct from external Page links', () => {
   state.drafts[0].sourceUrl = 'javascript:alert(1)';
   assert.equal(Core.isValidState(state), false);
 });
+
+
+test('HTTPS URL validation permits public source links and rejects credentials or unsafe schemes', () => {
+  assert.equal(Core.isSafeHttpsUrl('https://example.com/article'), true);
+  assert.equal(Core.isSafeHttpsUrl('https://www.facebook.com/posts/123'), true);
+  assert.equal(Core.isSafeHttpsUrl('http://example.com/article'), false);
+  assert.equal(Core.isSafeHttpsUrl('javascript:alert(1)'), false);
+  assert.equal(Core.isSafeHttpsUrl('https://user:password@example.com/article'), false);
+  assert.equal(Core.isSafeHttpsUrl('https://'), false);
+});
+
+test('legacy group batch settings are clamped to safe bounds without losing saved data', () => {
+  const legacy = Core.createDefaultState();
+  legacy.settings.groupLimit = 500;
+  legacy.settings.delay = 300;
+  legacy.groups.push({ id: 'g-safe', name: 'Saved group', url: 'https://www.facebook.com/groups/safe', selected: true });
+  const migrated = Core.migrateState(legacy);
+  assert.equal(migrated.settings.groupLimit, 10);
+  assert.equal(migrated.settings.delay, 5);
+  assert.equal(migrated.groups[0].id, 'g-safe');
+  assert.equal(Core.isValidState(migrated), true);
+});

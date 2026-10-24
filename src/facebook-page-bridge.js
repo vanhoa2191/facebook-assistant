@@ -36,8 +36,32 @@
       const host = url.hostname.toLowerCase();
       if (url.protocol !== 'https:' ||
           !['facebook.com', 'www.facebook.com', 'web.facebook.com', 'm.facebook.com'].includes(host)) return false;
-      if (url.searchParams.has('story_fbid') || url.searchParams.has('fbid')) return true;
-      return /(?:^|\/)(?:posts|permalink|videos|reel|photo|photos|watch|share\/p)(?:\/|$)/i.test(url.pathname);
+
+      const numericId = value => /^[0-9]{3,30}$/.test(String(value || ''));
+      const path = url.pathname.replace(/\\/+$/, '') || '/';
+      const segments = path.split('/').filter(Boolean);
+
+      // Story links must identify a specific story, not merely carry an arbitrary fbid query.
+      if (numericId(url.searchParams.get('story_fbid'))) return true;
+
+      // Photo URLs can identify the photo by query only on an explicitly photo-specific route.
+      if (/^\\/(?:photo\\.php|photo)\\/?$/i.test(path) && numericId(url.searchParams.get('fbid'))) return true;
+
+      // Watch URLs require a concrete video id; /watch/ alone is a listing route.
+      if (/^\\/watch\\/?$/i.test(path) && numericId(url.searchParams.get('v'))) return true;
+
+      // Explicit permalink routes require a concrete identifier at the end of the path.
+      if (/(?:^|\\/)(?:posts|permalink|videos|reel|photos)\\/[0-9]{3,30}$/i.test(path)) return true;
+      if (/^\\/share\\/p\\/[A-Za-z0-9_-]{5,}$/i.test(path)) return true;
+
+      // Group posts use /groups/<group-id>/posts/<post-id>.
+      if (/^\\/groups\\/[A-Za-z0-9.-]+\\/posts\\/[0-9]{3,30}$/i.test(path)) return true;
+
+      // Profile/timeline posts can have a profile slug or numeric owner before /posts/<id>.
+      if (/^\\/[^/]+\\/posts\\/[0-9]{3,30}$/i.test(path)) return true;
+
+      // Reject generic feed, search, watch, photos and arbitrary ?fbid= URLs.
+      return false;
     } catch (_) {
       return false;
     }

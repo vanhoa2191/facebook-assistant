@@ -62,7 +62,7 @@ function loadApp(options) {
         if ((args.origins || []).some(origin => origin.includes('graph.facebook.com'))) return Boolean(settings.graphPermission);
         return false;
       },
-      request: async () => false
+      request: async args => Array.isArray(args.permissions) && args.permissions.includes('notifications') && Boolean(settings.notificationsRequestGranted)
     },
     tabs: {
       create: async options => { openedTabs.push(options); return { id: openedTabs.length }; },
@@ -290,4 +290,39 @@ test('opening selected groups respects the configured batch limit', async () => 
   assert.equal(openedTabs[0].url, 'https://www.facebook.com/groups/one');
   assert.equal(openedTabs[1].url, 'https://www.facebook.com/groups/two');
   assert.match(elements['#toast'].textContent, /Đã mở 2 tab nhóm/);
+});
+
+
+test('notification permission is requested explicitly from the reminders module', async () => {
+  const { elements, listeners } = loadApp({ notificationsRequestGranted: true });
+  await new Promise(resolve => setTimeout(resolve, 10));
+  const clickNav = nav => listeners['document:click']({ target: { closest(selector) {
+    return selector === '[data-nav]' ? { dataset: { nav } } : null;
+  } } });
+  const clickAction = action => listeners['document:click']({ target: { closest(selector) {
+    return selector === '[data-action]' ? { dataset: { action } } : null;
+  } } });
+  clickNav('schedule');
+  assert.match(elements['#view'].innerHTML, /Chưa cấp quyền thông báo/);
+  clickAction('requestNotificationPermission');
+  await new Promise(resolve => setTimeout(resolve, 10));
+  assert.match(elements['#view'].innerHTML, /Đã bật thông báo trên máy/);
+  assert.match(elements['#toast'].textContent, /Đã bật thông báo/);
+});
+
+test('reminder creation rejects a date in the past', async () => {
+  const { elements, listeners } = loadApp();
+  await new Promise(resolve => setTimeout(resolve, 10));
+  const clickNav = nav => listeners['document:click']({ target: { closest(selector) {
+    return selector === '[data-nav]' ? { dataset: { nav } } : null;
+  } } });
+  const clickAction = action => listeners['document:click']({ target: { closest(selector) {
+    return selector === '[data-action]' ? { dataset: { action } } : null;
+  } } });
+  clickNav('schedule');
+  elements['#taskName'] = { value: 'Past reminder' };
+  elements['#taskTime'] = { value: new Date(Date.now() - 60000).toISOString().slice(0, 16) };
+  clickAction('addTask');
+  await new Promise(resolve => setTimeout(resolve, 10));
+  assert.match(elements['#toast'].textContent, /ở trong tương lai/);
 });

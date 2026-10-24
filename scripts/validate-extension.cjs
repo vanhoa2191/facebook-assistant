@@ -18,7 +18,7 @@ assert.ok(manifest.background && fs.existsSync(path.join(root, manifest.backgrou
 assert.ok(Array.isArray(manifest.permissions), 'permissions must be an array');
 assert.deepEqual([...manifest.permissions].sort(), ['alarms', 'storage'], 'Only storage and alarms are required permissions');
 assert.deepEqual([...manifest.optional_permissions].sort(), ['notifications', 'scripting'], 'Only notifications and scripting may be requested as optional permissions');
-assert.deepEqual([...manifest.optional_host_permissions].sort(), ['https://generativelanguage.googleapis.com/*', 'https://graph.facebook.com/*', 'https://m.facebook.com/*', 'https://meta.ai/*', 'https://web.facebook.com/*', 'https://www.facebook.com/*'].sort(), 'Only Gemini, Facebook visible-post capture, Facebook Graph API, and Meta AI Web origins may be requested optionally');
+assert.deepEqual([...manifest.optional_host_permissions].sort(), ['https://generativelanguage.googleapis.com/*', 'https://graph.facebook.com/*', 'https://m.facebook.com/*', 'https://meta.ai/*', 'https://web.facebook.com/*', 'https://www.facebook.com/*', 'https://www.meta.ai/*'].sort(), 'Only Gemini, Facebook visible-post capture, Facebook Graph API, and Meta AI Web origins may be requested optionally');
 assert.equal(manifest.host_permissions, undefined, 'No permanent host permissions');
 assert.equal(manifest.content_scripts, undefined, 'No content scripts in this phase');
 

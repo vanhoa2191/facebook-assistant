@@ -39,6 +39,7 @@
   let pageTokenPresent = false;
   let graphPermissionPresent = false;
   let metaWebPermissionPresent = false;
+  let notificationPermissionPresent = false;
   let metaWebLastSuccess = false;
   let metaWebStatus = '';
   let pageComposerDraft = '';
@@ -276,6 +277,7 @@
     ).join('');
     const pageSchedules = (state.pageSchedules || []).slice().sort((a, b) => Date.parse(a.scheduledAt) - Date.parse(b.scheduledAt));
     return '<div class="grid"><section class="panel purple"><h2>Lịch nhắc việc</h2><p>Nhắc việc cục bộ bằng Chrome Alarms</p>' +
+      '<div class="status-box"><span class="pill">' + (notificationPermissionPresent ? 'Đã bật thông báo trên máy' : 'Chưa cấp quyền thông báo') + '</span></div>' + button('Cấp quyền thông báo', 'requestNotificationPermission', 'primary') +
       field('Tên công việc', 'taskName', '') + field('Ngày giờ nhắc', 'taskTime', '', 'datetime-local') +
       '<div class="field"><label for="taskDraftId">Gắn bản nháp (không bắt buộc)</label><select id="taskDraftId">' + draftOptions + '</select></div>' +
       button('Lưu nhắc việc', 'addTask', 'primary full') + '<div class="banner">Nhắc việc chỉ nhắc người dùng; không tự thực thi hành động Facebook. Có thể gắn bản nháp để mở nhanh khi đến hạn.</div></section><section class="panel"><h2>Nhắc việc đã lưu</h2>' +
@@ -384,12 +386,14 @@
       aiPermissionPresent = await chrome.permissions.contains({ origins: [GEMINI_ORIGIN] });
       graphPermissionPresent = await chrome.permissions.contains({ origins: [GRAPH_ORIGIN] });
       metaWebPermissionPresent = await chrome.permissions.contains({ permissions: ['scripting'], origins: META_AI_ORIGINS });
+      notificationPermissionPresent = await chrome.permissions.contains({ permissions: ['notifications'] });
     } catch (_) {
       aiKeyPresent = false;
       pageTokenPresent = false;
       aiPermissionPresent = false;
       graphPermissionPresent = false;
       metaWebPermissionPresent = false;
+      notificationPermissionPresent = false;
     }
   }
   function waitForMetaTabReady(tabId, timeoutMs) {
@@ -1238,13 +1242,27 @@
         state.tasks = state.tasks.filter(task => task.id !== id);
         log('Đã xóa nhắc việc');
         break;
+      case 'requestNotificationPermission': {
+        const granted = await chrome.permissions.request({ permissions: ['notifications'] });
+        notificationPermissionPresent = Boolean(granted);
+        if (granted) {
+          log('Đã cấp quyền thông báo nhắc việc');
+          toast('Đã bật thông báo khi nhắc việc đến hạn.');
+        } else {
+          toast('Chưa cấp quyền thông báo. Extension vẫn hiển thị số nhắc việc đến hạn trên biểu tượng.');
+        }
+        await save();
+        render();
+        return;
+      }
       case 'addTask': {
         const nameValue = $('#taskName').value.trim();
         const timeValue = $('#taskTime').value;
-        if (!nameValue || nameValue.length > 200 || !timeValue || Number.isNaN(Date.parse(timeValue))) {
+        if (!nameValue || nameValue.length > 200 || !timeValue || !Number.isFinite(Date.parse(timeValue))) {
           toast('Nhập tên công việc và thời gian hợp lệ');
           return;
         }
+        if (Date.parse(timeValue) <= Date.now()) { toast('Thời điểm nhắc phải ở trong tương lai.'); return; }
         const draftId = $('#taskDraftId') ? $('#taskDraftId').value : '';
         state.tasks.push({ id: crypto.randomUUID(), name: nameValue, time: timeValue, status: 'scheduled', ...(draftId ? { draftId } : {}) });
         log('Đã lưu nhắc việc: ' + nameValue);

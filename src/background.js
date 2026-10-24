@@ -18,6 +18,26 @@ async function updateBadge(state) {
   await chrome.action.setTitle({ title: due ? 'Facebook AI Assistant: ' + due + ' nhắc việc đến hạn' : 'Mở Facebook AI Assistant' });
 }
 
+async function notifyTaskDue(task) {
+  try {
+    const granted = await chrome.permissions.contains({ permissions: ['notifications'] });
+    if (!granted || !chrome.notifications) return false;
+    const draftNote = task.draftId ? ' · Mở extension để xem bản nháp đã gắn.' : '';
+    await chrome.notifications.create('faa-reminder:' + task.id, {
+      type: 'basic',
+      iconUrl: chrome.runtime.getURL('src/notification.svg'),
+      title: 'Facebook AI Assistant · Nhắc việc đến hạn',
+      message: String(task.name || 'Công việc đến hạn').slice(0, 240) + draftNote,
+      contextMessage: String(task.time || ''),
+      priority: 1,
+      requireInteraction: true
+    });
+    return true;
+  } catch (_) {
+    return false;
+  }
+}
+
 async function syncTaskAlarms() {
   const result = await chrome.storage.local.get(STATE_KEY);
   const state = result[STATE_KEY] || FAACore.createDefaultState();
@@ -25,6 +45,7 @@ async function syncTaskAlarms() {
   const alarms = await chrome.alarms.getAll();
   await Promise.all(alarms.filter(alarm => alarm.name.startsWith(ALARM_PREFIX)).map(alarm => chrome.alarms.clear(alarm.name)));
   let changed = false;
+  const dueTasks = [];
   const now = Date.now();
   for (const task of state.tasks) {
     if (!task || ['done', 'missed', 'due'].includes(task.status)) continue;
@@ -33,6 +54,7 @@ async function syncTaskAlarms() {
     if (when <= now) {
       task.status = 'due';
       addLog(state, 'Nhắc việc đến hạn: ' + task.name);
+      dueTasks.push(task);
       changed = true;
     } else {
       chrome.alarms.create(ALARM_PREFIX + task.id, { when });
@@ -41,6 +63,7 @@ async function syncTaskAlarms() {
   }
   if (changed) await chrome.storage.local.set({ [STATE_KEY]: state });
   await updateBadge(state);
+  for (const task of dueTasks) await notifyTaskDue(task);
 }
 
 chrome.runtime.onInstalled.addListener(async () => {
@@ -63,10 +86,17 @@ chrome.alarms.onAlarm.addListener(async alarm => {
   addLog(state, 'Nhắc việc đến hạn: ' + task.name);
   await chrome.storage.local.set({ [STATE_KEY]: state });
   await updateBadge(state);
+  await notifyTaskDue(task);
+});
+chrome.notifications.onClicked.addListener(notificationId => {
+  if (String(notificationId).startsWith('faa-reminder:')) {
+    chrome.tabs.create({ url: chrome.runtime.getURL('dashboard.html') });
+    chrome.notifications.clear(notificationId);
+  }
 });
 chrome.action.onClicked.addListener(() => {
   chrome.tabs.create({ url: chrome.runtime.getURL('dashboard.html') });
 });
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-  if (message && message.type === 'PING') sendResponse({ ok: true, version: '0.7.1' });
+  if (message && message.type === 'PING') sendResponse({ ok: true, version: '0.7.2' });
 });

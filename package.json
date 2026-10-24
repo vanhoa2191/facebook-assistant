@@ -1,8 +1,8 @@
 {
   "name": "facebook-ai-assistant",
-  "version": "0.5.0",
+  "version": "0.6.0",
   "private": true,
-  "description": "Manifest V3 dashboard with Gemini drafts, Facebook Pages publishing and scheduling, group CSV workflows, and local reminders",
+  "description": "Manifest V3 assistant using the Meta AI website through explicit browser UI automation, plus reviewed Facebook Page publishing",
   "scripts": {
     "test": "node --test",
     "validate": "node scripts/validate-extension.cjs",

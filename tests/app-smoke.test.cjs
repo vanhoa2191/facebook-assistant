@@ -64,7 +64,7 @@ test('dashboard initializes and renders all 12 navigation modules', async () => 
   const { elements } = loadApp();
   await new Promise(resolve => setTimeout(resolve, 10));
   const sidebar = elements['#sidebar'].innerHTML;
-  assert.equal((sidebar.match(/data-nav=/g) || []).length, 12);
+  assert.equal((sidebar.match(/data-nav=/g) || []).length, 13);
   assert.equal(elements['#pageTitle'].textContent, 'Quản lý nhóm và tương tác');
   assert.match(elements['#view'].innerHTML, /Thêm nhóm/);
   assert.match(elements['#view'].innerHTML, /Theo dõi tương tác/);
@@ -136,4 +136,12 @@ test('navigation opens the AI and sales modules without runtime errors', async (
   assert.equal(elements['#pageTitle'].textContent, 'Lịch chạy');
   assert.match(elements['#view'].innerHTML, /taskDraftId/);
   assert.match(elements['#view'].innerHTML, /Lịch đăng Facebook Page/);
+  assert.match(elements['#view'].innerHTML, /Lưu chỉnh sửa thành nháp/);
+
+  click({ target: { closest(selector) {
+    return selector === '[data-nav]' ? { dataset: { nav: 'review' } } : null;
+  } } });
+  assert.equal(elements['#pageTitle'].textContent, 'Hàng đợi duyệt bài');
+  assert.match(elements['#view'].innerHTML, /AI chỉ tạo bản nháp/);
+  assert.match(elements['#view'].innerHTML, /reviewStatusFilter/);
 });

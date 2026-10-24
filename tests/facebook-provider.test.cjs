@@ -97,3 +97,14 @@ test('rejects Page scheduling less than 10 minutes or more than 30 days ahead', 
     ...base, scheduledPublishAt: new Date(Date.now() + 31 * 24 * 60 * 60 * 1000).toISOString()
   }), /tối đa 30 ngày/);
 });
+
+
+test('rejects HTTPS links that embed credentials before calling Facebook', async () => {
+  let calls = 0;
+  const fetchImpl = async () => { calls += 1; return { ok: true, status: 200, json: async () => ({ id: '123_456' }) }; };
+  await assert.rejects(Facebook.publishPagePost({
+    pageId: '12345678', accessToken: 'test-page-token-12345',
+    message: 'A safe post', link: 'https://user:password@example.com/path', fetchImpl
+  }), /không chứa thông tin đăng nhập/);
+  assert.equal(calls, 0);
+});

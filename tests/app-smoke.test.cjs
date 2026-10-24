@@ -117,6 +117,7 @@ test('navigation opens the AI and sales modules without runtime errors', async (
   assert.match(elements['#view'].innerHTML, /Page access token/);
   assert.match(elements['#view'].innerHTML, /Đăng ngay \/ lên lịch trên Page/);
   assert.match(elements['#view'].innerHTML, /pagePublishTime/);
+  assert.match(elements['#view'].innerHTML, /Lưu chỉnh sửa thành nháp/);
 
   click({ target: { closest(selector) {
     return selector === '[data-nav]' ? { dataset: { nav: 'share' } } : null;
@@ -136,7 +137,6 @@ test('navigation opens the AI and sales modules without runtime errors', async (
   assert.equal(elements['#pageTitle'].textContent, 'Lịch chạy');
   assert.match(elements['#view'].innerHTML, /taskDraftId/);
   assert.match(elements['#view'].innerHTML, /Lịch đăng Facebook Page/);
-  assert.match(elements['#view'].innerHTML, /Lưu chỉnh sửa thành nháp/);
 
   click({ target: { closest(selector) {
     return selector === '[data-nav]' ? { dataset: { nav: 'review' } } : null;

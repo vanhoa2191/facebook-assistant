@@ -1,8 +1,8 @@
 {
   "name": "facebook-ai-assistant",
-  "version": "0.7.2",
+  "version": "0.7.3",
   "private": true,
-  "description": "Manifest V3 assistant with Meta AI Web drafting, review queue, confirmed Page publishing, and desktop reminders",
+  "description": "Manifest V3 assistant with on-demand visible Facebook post capture, Meta AI Web, profile analysis, weekly reports, and confirmed Page publishing",
   "scripts": {
     "test": "node --test",
     "validate": "node scripts/validate-extension.cjs",

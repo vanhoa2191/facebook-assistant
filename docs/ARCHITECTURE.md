@@ -6,8 +6,8 @@
 - src/ai-provider.js: optional Gemini API adapter with model validation, timeout, response parsing, and normalized errors.
 - src/meta-ai-bridge.js: on-demand UI bridge injected into the signed-in meta.ai tab after optional permissions are granted; interacts with visible DOM controls and extracts a stable answer without calling a model API.
 - src/facebook-provider.js: versioned Facebook Pages Graph API adapter with token in POST body, timeout, and normalized errors.
-- src/app.js: navigation, group list, AI generation, draft review queue, approval lifecycle, Page publishing and scheduling, reminders, import/export, and logs.
-- src/background.js: extension lifecycle, reminder alarms, action badge, and optional desktop notifications.
+- src/app.js: navigation, group list, manual contacts, visible-post capture, contextual profile analysis, weekly analytics/CSV export, draft review queue, approval lifecycle, Page publishing and scheduling, reminders, import/export, and logs.
+- src/background.js: extension lifecycle, task reminders, weekly local-report alarms, action badge, and optional desktop notifications.
 - tests/: deterministic Node.js unit tests.
 - scripts/: extension validation and ZIP packaging.
 - .github/workflows/ci.yml: GitHub Actions validation and package workflow.

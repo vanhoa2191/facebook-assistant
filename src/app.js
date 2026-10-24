@@ -13,18 +13,19 @@
     ['connect', '♧', 'Kết bạn'], ['scrape', '▤', 'Cào bài'], ['groups', '♧', 'Nhóm'],
     ['pages', '⚑', 'Nuôi Page'], ['share', '↗', 'Share bài'], ['sales', '▣', 'Đăng bán'],
     ['learn', '▥', 'Học nhóm'], ['feed', '◉', 'Bản tin & AI'], ['engage', '♡', 'Lấy lại tương tác'],
-    ['ai', '⚙', 'AI chung'], ['schedule', '▦', 'Lịch chạy'], ['logs', '▤', 'Nhật ký']
+    ['ai', '⚙', 'AI chung'], ['review', '✓', 'Duyệt bài'], ['schedule', '▦', 'Lịch chạy'], ['logs', '▤', 'Nhật ký']
   ];
   const TITLES = {
     connect: 'Kết bạn', scrape: 'Cào bài', groups: 'Quản lý nhóm và tương tác', pages: 'Nuôi Page',
     share: 'Share bài vào nhóm đã tham gia', sales: 'Đăng bán', learn: 'Học nhóm',
     feed: 'Bản tin & AI', engage: 'Lấy lại tương tác', ai: 'Hồ sơ AI dùng chung',
-    schedule: 'Lịch chạy', logs: 'Nhật ký'
+    review: 'Hàng đợi duyệt bài', schedule: 'Lịch chạy', logs: 'Nhật ký'
   };
   const DESCS = {
     groups: 'Quản lý nhóm đã tham gia, lựa chọn nhóm và chuẩn bị nội dung.',
     ai: 'Cấu hình AI Provider, prompt và hồ sơ theo từng chức năng.',
     logs: 'Theo dõi thao tác, lỗi và xuất dữ liệu.',
+    review: 'Kiểm tra, duyệt hoặc từ chối bản nháp trước khi đăng.',
     share: 'Chuẩn bị nội dung chia sẻ với lời dẫn theo từng nhóm.'
   };
   const $ = selector => document.querySelector(selector);
@@ -41,6 +42,8 @@
   let metaWebLastSuccess = false;
   let metaWebStatus = '';
   let pageComposerDraft = '';
+  let activePageDraftId = null;
+  let reviewStatusFilter = 'draft';
   let pagePublishStatus = '';
   let draftQuery = '';
   let draftKindFilter = 'all';
@@ -64,13 +67,13 @@
     const drafts = state.drafts.slice().reverse().slice(0, limit || 10);
     if (!drafts.length) return '<div class="placeholder">Chưa có bản nháp.</div>';
     return '<div class="draft-list">' + drafts.map(draft =>
-      '<article class="draft"><div class="draft-meta"><span class="pill">' + esc(draft.kind || 'source') + '</span><time>' + esc(draft.createdAt) + '</time></div>' +
+      '<article class="draft"><div class="draft-meta"><span class="pill">' + esc(draft.kind || 'source') + '</span><span class="pill">' + esc(reviewStatusLabel(draft.reviewStatus)) + '</span><time>' + esc(draft.createdAt) + '</time></div>' +
       (draft.targetGroupName ? '<div class="draft-target">Nhóm đích: ' + esc(draft.targetGroupName) + '</div>' : '') +
       '<p class="draft-text">' + esc(draft.text.slice(0, 700)) + (draft.text.length > 700 ? '…' : '') + '</p>' +
       '<div class="btnrow">' + button('Sao chép', 'copyDraft', '', draft.id) + button('Sửa', 'editDraft', '', draft.id) +
       (draft.url && Core.isSafeFacebookUrl(draft.url) ? button('Mở bài gốc', 'openDraftSource', '', draft.id) : '') +
       (draft.targetGroupUrl ? button('Mở nhóm', 'openDraftGroup', '', draft.id) : '') +
-      button('Dùng cho Page', 'useDraftForPage', '', draft.id) +
+      button('Duyệt bài', 'reviewDraft', '', draft.id) + button('Dùng cho Page', 'useDraftForPage', '', draft.id) +
       button('Xóa', 'deleteDraft', 'warn', draft.id) + '</div></article>'
     ).join('') + '</div>';
   }
@@ -169,6 +172,40 @@
       '<div class="btnrow">' + button('Lưu kết quả thành nháp', 'saveExternalAiDraft') + button('Lưu nguyên văn đầu vào', 'saveAiDraft') + '</div>' +
       '<h3>Nháp gần đây</h3>' + draftList(5) + '</section></div>';
   }
+  function renderReviewQueue() {
+    const drafts = state.drafts.slice().reverse();
+    const counts = {
+      draft: drafts.filter(item => (item.reviewStatus || 'draft') === 'draft').length,
+      approved: drafts.filter(item => item.reviewStatus === 'approved').length,
+      scheduled: drafts.filter(item => item.reviewStatus === 'scheduled').length,
+      published: drafts.filter(item => item.reviewStatus === 'published').length,
+      rejected: drafts.filter(item => item.reviewStatus === 'rejected').length,
+      failed: drafts.filter(item => item.reviewStatus === 'failed').length
+    };
+    const filtered = drafts.filter(item => reviewStatusFilter === 'all' || (item.reviewStatus || 'draft') === reviewStatusFilter);
+    const cards = filtered.length ? filtered.map(draft => {
+      const status = draft.reviewStatus || 'draft';
+      const canReview = !['published', 'scheduled'].includes(status);
+      return '<article class="draft"><div class="draft-meta"><span class="pill">' + esc(draft.kind || 'source') + '</span><span class="pill">' + esc(reviewStatusLabel(status)) + '</span><time>' + esc(draft.updatedAt || draft.createdAt) + '</time></div>' +
+        (draft.targetGroupName ? '<div class="draft-target">Nhóm đích: ' + esc(draft.targetGroupName) + '</div>' : '') +
+        (draft.publishError ? '<div class="banner">Lỗi lần đăng trước: ' + esc(draft.publishError) + '</div>' : '') +
+        (draft.rejectionReason ? '<div class="banner">Lý do từ chối: ' + esc(draft.rejectionReason) + '</div>' : '') +
+        '<p class="draft-text">' + esc(draft.text.slice(0, 1600)) + (draft.text.length > 1600 ? '…' : '') + '</p>' +
+        (draft.postId ? '<small>Post ID: ' + esc(draft.postId) + (draft.pageId ? ' · Page ID: ' + esc(draft.pageId) : '') + '</small>' : '') +
+        '<div class="btnrow">' + button('Sao chép', 'copyDraft', '', draft.id) + button('Sửa', 'editDraft', '', draft.id) +
+        (canReview ? button(status === 'approved' ? 'Tiếp tục duyệt Page' : 'Duyệt & soạn Page', 'reviewDraft', 'primary', draft.id) : '') +
+        (['draft', 'approved', 'failed'].includes(status) ? button('Từ chối', 'rejectDraft', 'warn', draft.id) : '') +
+        (['rejected', 'failed'].includes(status) ? button('Đưa về chờ duyệt', 'reopenDraft', '', draft.id) : '') +
+        button('Xóa', 'deleteDraft', 'warn', draft.id) + '</div></article>';
+    }).join('') : '<div class="placeholder">Không có bản nháp ở trạng thái này.</div>';
+    return '<section class="panel blue"><h2>Hàng đợi duyệt bài</h2><p>AI chỉ tạo bản nháp. Không bài nào được đăng khi chưa có thao tác duyệt riêng.</p>' +
+      '<div class="metric"><div><small>Chờ duyệt</small><span>' + counts.draft + '</span></div><div><small>Đã duyệt</small><span>' + counts.approved + '</span></div><div><small>Đã lên lịch</small><span>' + counts.scheduled + '</span></div><div><small>Đã đăng</small><span>' + counts.published + '</span></div></div>' +
+      '<div class="field"><label for="reviewStatusFilter">Lọc theo trạng thái</label><select id="reviewStatusFilter">' +
+      [['draft','Chờ duyệt'],['approved','Đã duyệt · chờ đăng'],['failed','Đăng thất bại'],['scheduled','Đã lên lịch'],['published','Đã đăng'],['rejected','Đã từ chối'],['all','Tất cả']].map(item => '<option value="' + item[0] + '" ' + (reviewStatusFilter === item[0] ? 'selected' : '') + '>' + item[1] + '</option>').join('') +
+      '</select></div><div class="btnrow">' + button('Áp dụng bộ lọc', 'filterReviewQueue', 'primary') + button('Hiện tất cả', 'clearReviewFilter') + '</div>' +
+      '<div class="banner">Duyệt & soạn Page chỉ chuyển nội dung vào trình soạn. Bước đăng công khai vẫn yêu cầu bạn kiểm tra và xác nhận riêng. Nhóm Facebook vẫn phải đăng thủ công.</div>' +
+      '<p>' + filtered.length + ' bản nháp · Từ chối: ' + counts.rejected + ' · Lỗi: ' + counts.failed + '</p><div class="draft-list">' + cards + '</div></section>';
+  }
   function renderPages() {
     return '<div class="grid"><section class="panel blue"><h2>Đăng bài lên Facebook Page</h2><p>Sử dụng Meta Graph API chính thức với Page access token của bạn</p>' +
       field('Page ID (chỉ số)', 'pageId', state.settings.pageId || '') +
@@ -258,6 +295,7 @@
   function renderPage() {
     if (page === 'groups') return renderGroups();
     if (page === 'pages') return renderPages();
+    if (page === 'review') return renderReviewQueue();
     if (page === 'ai') return renderAI();
     if (page === 'share') return renderShare();
     if (page === 'schedule') return renderSchedule();
@@ -390,11 +428,14 @@
     return Gemini.generateContent({ apiKey, model, prompt });
   }
   function addDraft(text, url, kind, group) {
-    const draft = { id: crypto.randomUUID(), text: String(text).slice(0, 20000), url: String(url || '').slice(0, 2048), createdAt: new Date().toISOString(), kind: kind || 'source' };
+    const draft = { id: crypto.randomUUID(), text: String(text).slice(0, 20000), url: String(url || '').slice(0, 2048), createdAt: new Date().toISOString(), kind: kind || 'source', reviewStatus: 'draft' };
     if (group) { draft.targetGroupId = group.id; draft.targetGroupName = group.name; draft.targetGroupUrl = group.url; }
     state.drafts.push(draft);
     if (state.drafts.length > 1000) state.drafts.shift();
     return draft;
+  }
+  function reviewStatusLabel(status) {
+    return ({ draft: 'Chờ duyệt', approved: 'Đã duyệt · chờ đăng', rejected: 'Đã từ chối', scheduled: 'Đã lên lịch', published: 'Đã đăng', failed: 'Đăng thất bại' })[status || 'draft'] || 'Chờ duyệt';
   }
   function toast(message) {
     const element = $('#toast');

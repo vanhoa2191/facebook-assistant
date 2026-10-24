@@ -1629,6 +1629,8 @@
     if (toastSequence === toastSequenceAtStart) toast('Đã lưu trên trình duyệt');
   }
   function init() {
+    const requestedPage = window.location && typeof window.location.hash === 'string' ? window.location.hash.slice(1) : '';
+    if (NAV.some(item => item[0] === requestedPage)) page = requestedPage;
     chrome.storage.local.get('faa.state').then(async result => {
       const stored = result['faa.state'];
       const migrated = stored ? Core.migrateState(stored) : null;

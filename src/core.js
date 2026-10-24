@@ -146,7 +146,9 @@
       (item.status === undefined || item.status === 'scheduled'))) return false;
     if (!value.drafts.every(draft => isObject(draft) &&
       isText(draft.id, 100) && isText(draft.text, 20000) &&
-      isText(draft.url, 2048) && isText(draft.createdAt, 100) &&
+      isText(draft.url, 2048) &&
+      (draft.sourceUrl === undefined || (isText(draft.sourceUrl, 2048) && (!draft.sourceUrl || /^https:\/\//i.test(draft.sourceUrl)))) &&
+      isText(draft.createdAt, 100) &&
       (draft.kind === undefined || ['source', 'share', 'ai'].includes(draft.kind)) &&
       (draft.targetGroupId === undefined || isText(draft.targetGroupId, 100)) &&
       (draft.targetGroupName === undefined || isText(draft.targetGroupName, 200)) &&

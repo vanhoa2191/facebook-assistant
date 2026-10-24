@@ -221,6 +221,7 @@
       const canReview = !['published', 'scheduled'].includes(status);
       return '<article class="draft"><div class="draft-meta"><span class="pill">' + esc(draft.kind || 'source') + '</span><span class="pill">' + esc(reviewStatusLabel(status)) + '</span><time>' + esc(draft.updatedAt || draft.createdAt) + '</time></div>' +
         (draft.targetGroupName ? '<div class="draft-target">Nhóm đích: ' + esc(draft.targetGroupName) + '</div>' : '') +
+        (draft.pageLink ? '<div class="draft-target">Link đính kèm Page: ' + esc(draft.pageLink) + '</div>' : '') +
         (draft.publishError ? '<div class="banner">Lỗi lần đăng trước: ' + esc(draft.publishError) + '</div>' : '') +
         (draft.rejectionReason ? '<div class="banner">Lý do từ chối: ' + esc(draft.rejectionReason) + '</div>' : '') +
         '<p class="draft-text">' + esc(draft.text.slice(0, 1600)) + (draft.text.length > 1600 ? '…' : '') + '</p>' +

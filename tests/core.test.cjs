@@ -176,3 +176,12 @@ test('manual engagement items require safe Facebook URLs and known statuses', ()
   assert.equal(Core.isSafeFacebookUrl('http://facebook.com/posts/123'), false);
   assert.equal(Core.isSafeFacebookUrl('https://facebook.com.evil.example/posts/123'), false);
 });
+
+
+test('legacy demo provider migrates to Meta AI Web by default', () => {
+  const legacy = Core.createDefaultState();
+  legacy.settings.provider = 'demo';
+  const migrated = Core.migrateState(legacy);
+  assert.equal(migrated.settings.provider, 'meta');
+  assert.equal(Core.isValidState(migrated), true);
+});

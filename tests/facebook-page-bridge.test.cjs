@@ -90,3 +90,35 @@ test('Facebook page bridge caps large visible text to the documented limit', () 
   assert.equal(result.ok, true);
   assert.ok(result.text.length <= 50000);
 });
+
+
+test('Facebook page bridge rejects listing routes and arbitrary fbid queries', () => {
+  const invalidUrls = [
+    'https://www.facebook.com/watch/',
+    'https://www.facebook.com/photos/',
+    'https://www.facebook.com/?fbid=123',
+    'https://www.facebook.com/watch/?foo=123',
+    'https://www.facebook.com/groups/123/posts/',
+    'https://www.facebook.com/search/top?q=posts'
+  ];
+  for (const href of invalidUrls) {
+    const result = loadBridge({ href, mainText: 'This is enough visible text to pass the content length check.' }).capture();
+    assert.equal(result.ok, false, 'must reject non-permalink URL: ' + href);
+  }
+});
+
+test('Facebook page bridge accepts specific post, video, story, and photo permalinks', () => {
+  const validUrls = [
+    'https://www.facebook.com/groups/123/posts/456789',
+    'https://www.facebook.com/example/posts/456789',
+    'https://www.facebook.com/permalink/456789',
+    'https://www.facebook.com/watch/?v=456789',
+    'https://www.facebook.com/story.php?story_fbid=456789&id=123456',
+    'https://www.facebook.com/photo.php?fbid=456789&id=123456',
+    'https://www.facebook.com/share/p/AbCdEf123/'
+  ];
+  for (const href of validUrls) {
+    const result = loadBridge({ href, mainText: 'This is enough visible text to pass the content length check.' }).capture();
+    assert.equal(result.ok, true, 'should accept specific permalink: ' + href);
+  }
+});

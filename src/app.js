@@ -588,7 +588,11 @@
         const message = $('#pageMessage').value.trim();
         const link = $('#pageLink').value.trim();
         if (!message || message.length > 20000) { toast('Bản nháp phải có từ 1 đến 20.000 ký tự.'); return; }
-        if (link && !Core.isSafeFacebookUrl(link)) { toast('Link phải thuộc Facebook và sử dụng HTTPS.'); return; }
+        if (link) {
+          let validLink = false;
+          try { validLink = new URL(link).protocol === 'https:' && link.length <= 2048; } catch (_) {}
+          if (!validLink) { toast('Link phải là HTTPS hợp lệ.'); return; }
+        }
         let draft = activePageDraftId ? state.drafts.find(item => item.id === activePageDraftId) : null;
         if (draft) {
           draft.text = message;
@@ -667,6 +671,8 @@
             pagePublishStatus = 'Đăng thành công. Post ID: ' + result.id;
             log('Đã đăng bài lên Page ' + pageId + '; Post ID: ' + result.id);
           }
+          activePageDraftId = null;
+          pageComposerDraft = '';
           await save();
           render();
           toast(result.scheduled ? 'Đã gửi lịch đăng tới Meta.' : 'Đã đăng bài lên Page.');

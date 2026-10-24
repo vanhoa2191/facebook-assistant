@@ -20,7 +20,9 @@ function loadApp(options) {
       click() { this.clicked = true; }
     };
   }
+  const rootStyle = { values: {}, setProperty(name, value) { this.values[name] = value; } };
   const document = {
+    documentElement: { style: rootStyle },
     querySelector(selector) {
       if (!elements[selector]) elements[selector] = makeElement(selector);
       return elements[selector];
@@ -449,4 +451,16 @@ test('rebuilding a weekly report in the dashboard preserves its saved AI summary
   await new Promise(resolve => setTimeout(resolve, 15));
   assert.match(elements['#view'].innerHTML, /Tóm tắt AI đã được lưu trước đó/);
   assert.match(elements['#toast'].textContent, /Đã tạo báo cáo thống kê cục bộ/);
+});
+
+
+test('font size selector enlarges the dashboard and persists the chosen scale', async () => {
+  const { elements, listeners } = loadApp();
+  await new Promise(resolve => setTimeout(resolve, 10));
+  const select = elements['#fontSizeSelect'];
+  assert.equal(select.value, '1.2');
+  await listeners['document:change']({ target: { id: 'fontSizeSelect', value: '1.4' } });
+  await new Promise(resolve => setTimeout(resolve, 10));
+  assert.equal(select.value, '1.4');
+  assert.equal(elements['#toast'].textContent, 'Đã lưu cỡ chữ 140%.');
 });

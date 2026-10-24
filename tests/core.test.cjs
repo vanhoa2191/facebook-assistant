@@ -281,3 +281,30 @@ test('legacy published Page drafts migrate their attachment link without losing 
   assert.equal(migrated.drafts[0].sourceUrl, 'https://www.facebook.com/posts/123');
   assert.equal(Core.isValidState(migrated), true);
 });
+
+
+test('weekly report builder counts the current period, compares the prior period, and stays local', () => {
+  const state = Core.createDefaultState();
+  const now = Date.parse('2026-10-24T12:00:00.000Z');
+  state.observations.push(
+    { id: 'o1', sourceUrl: 'https://www.facebook.com/posts/1', capturedAt: '2026-10-23T12:00:00.000Z', text: 'Current observation one', contactId: 'c1', contactName: 'Alice' },
+    { id: 'o2', sourceUrl: 'https://www.facebook.com/posts/2', capturedAt: '2026-10-22T12:00:00.000Z', text: 'Current observation two', contactId: 'c1', contactName: 'Alice' },
+    { id: 'o3', sourceUrl: 'https://www.facebook.com/posts/3', capturedAt: '2026-10-15T12:00:00.000Z', text: 'Previous observation', contactId: 'c2', contactName: 'Bob' }
+  );
+  const report = Core.buildWeeklyReport(state, now);
+  assert.equal(report.observationsCount, 2);
+  assert.equal(report.profilesCount, 1);
+  assert.equal(report.previousObservationsCount, 1);
+  assert.match(report.summary, /Alice: 2/);
+  assert.match(report.summary, /tăng 1 quan sát/);
+  assert.equal(report.aiSummary, '');
+  state.weeklyReports.push(report);
+  assert.equal(Core.isValidState(state), true);
+});
+
+test('weekly report builder handles an empty observation period without inventing analysis', () => {
+  const report = Core.buildWeeklyReport(Core.createDefaultState(), Date.parse('2026-10-24T12:00:00.000Z'));
+  assert.equal(report.observationsCount, 0);
+  assert.equal(report.profilesCount, 0);
+  assert.match(report.summary, /chưa có quan sát nào/);
+});

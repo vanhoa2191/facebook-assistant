@@ -97,6 +97,13 @@ test('navigation opens the AI and sales modules without runtime errors', async (
   await new Promise(resolve => setTimeout(resolve, 10));
   const click = listeners['document:click'];
   click({ target: { closest(selector) {
+    return selector === '[data-nav]' ? { dataset: { nav: 'connect' } } : null;
+  } } });
+  assert.equal(elements['#pageTitle'].textContent, 'Kết bạn');
+  assert.match(elements['#view'].innerHTML, /contactUrl/);
+  assert.match(elements['#view'].innerHTML, /Không tự gửi lời mời kết bạn/);
+
+  click({ target: { closest(selector) {
     return selector === '[data-nav]' ? { dataset: { nav: 'ai' } } : null;
   } } });
   assert.equal(elements['#pageTitle'].textContent, 'Hồ sơ AI dùng chung');

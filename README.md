@@ -67,4 +67,4 @@ Requires Node.js 20 or newer. Run npm test, npm run validate, and npm run packag
 
 ## Data and privacy
 
-Application data is stored locally using chrome.storage.local. Exported JSON may contain group names and URLs, prompts, drafts, and reminders; review it before sharing. Gemini API keys and Page access tokens are deliberately excluded from exports. Meta AI Web uses your signed-in website session; the extension does not store Meta AI credentials or cookies.
+Application data is stored locally using chrome.storage.local. Exported JSON may contain group names, contact profiles and URLs, engagement notes, prompts, drafts, review statuses, and reminders; review it before sharing. Gemini API keys and Page access tokens are deliberately excluded from exports. Meta AI Web uses your signed-in website session; the extension does not store Meta AI credentials or cookies.

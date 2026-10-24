@@ -4,6 +4,8 @@ importScripts('core.js');
 
 const STATE_KEY = 'faa.state';
 const ALARM_PREFIX = 'faa-task:';
+const WEEKLY_REPORT_ALARM = 'faa-weekly-report';
+const WEEKLY_REPORT_PERIOD_MINUTES = 7 * 24 * 60;
 
 function addLog(state, message) {
   state.logs = Array.isArray(state.logs) ? state.logs : [];
@@ -38,11 +40,57 @@ async function notifyTaskDue(task) {
   }
 }
 
+async function notifyWeeklyReport(report) {
+  try {
+    const granted = await chrome.permissions.contains({ permissions: ['notifications'] });
+    if (!granted || !chrome.notifications) return false;
+    await chrome.notifications.create('faa-weekly-report:' + report.id, {
+      type: 'basic',
+      iconUrl: chrome.runtime.getURL('src/notification.svg'),
+      title: 'Facebook AI Assistant · Báo cáo tuần đã sẵn sàng',
+      message: String(report.summary || 'Đã tạo báo cáo tuần cục bộ.').slice(0, 240),
+      contextMessage: 'Mở Phân tích & báo cáo để xem và xuất CSV',
+      priority: 1,
+      requireInteraction: true
+    });
+    return true;
+  } catch (_) {
+    return false;
+  }
+}
+
+async function createWeeklyReport() {
+  const result = await chrome.storage.local.get(STATE_KEY);
+  const state = result[STATE_KEY] || FAACore.createDefaultState();
+  state.observations = Array.isArray(state.observations) ? state.observations : [];
+  state.weeklyReports = Array.isArray(state.weeklyReports) ? state.weeklyReports : [];
+  const report = FAACore.buildWeeklyReport(state, Date.now());
+  const existingIndex = state.weeklyReports.findIndex(item => item.id === report.id);
+  if (existingIndex >= 0) {
+    const previous = state.weeklyReports[existingIndex];
+    if (previous.aiSummary) {
+      report.aiSummary = previous.aiSummary;
+      report.aiSummaryAt = previous.aiSummaryAt;
+    }
+    state.weeklyReports[existingIndex] = report;
+  } else {
+    state.weeklyReports.push(report);
+  }
+  if (state.weeklyReports.length > 104) state.weeklyReports.splice(0, state.weeklyReports.length - 104);
+  addLog(state, 'Đã tạo báo cáo thống kê 7 ngày: ' + report.observationsCount + ' quan sát.');
+  await chrome.storage.local.set({ [STATE_KEY]: state });
+  await notifyWeeklyReport(report);
+  return report;
+}
+
 async function syncTaskAlarms() {
   const result = await chrome.storage.local.get(STATE_KEY);
   const state = result[STATE_KEY] || FAACore.createDefaultState();
   state.tasks = Array.isArray(state.tasks) ? state.tasks : [];
   const alarms = await chrome.alarms.getAll();
+  if (!alarms.some(alarm => alarm.name === WEEKLY_REPORT_ALARM)) {
+    chrome.alarms.create(WEEKLY_REPORT_ALARM, { delayInMinutes: WEEKLY_REPORT_PERIOD_MINUTES, periodInMinutes: WEEKLY_REPORT_PERIOD_MINUTES });
+  }
   await Promise.all(alarms.filter(alarm => alarm.name.startsWith(ALARM_PREFIX)).map(alarm => chrome.alarms.clear(alarm.name)));
   let changed = false;
   const dueTasks = [];
@@ -76,6 +124,10 @@ chrome.storage.onChanged.addListener((changes, areaName) => {
   if (areaName === 'local' && changes[STATE_KEY]) syncTaskAlarms().catch(() => {});
 });
 chrome.alarms.onAlarm.addListener(async alarm => {
+  if (alarm.name === WEEKLY_REPORT_ALARM) {
+    await createWeeklyReport();
+    return;
+  }
   if (!alarm.name.startsWith(ALARM_PREFIX)) return;
   const result = await chrome.storage.local.get(STATE_KEY);
   const state = result[STATE_KEY] || FAACore.createDefaultState();
@@ -89,8 +141,12 @@ chrome.alarms.onAlarm.addListener(async alarm => {
   await notifyTaskDue(task);
 });
 chrome.notifications.onClicked.addListener(notificationId => {
-  if (String(notificationId).startsWith('faa-reminder:')) {
-    chrome.tabs.create({ url: chrome.runtime.getURL('dashboard.html') });
+  const id = String(notificationId);
+  if (id.startsWith('faa-weekly-report:')) {
+    chrome.tabs.create({ url: chrome.runtime.getURL('dashboard.html#analytics') });
+    chrome.notifications.clear(notificationId);
+  } else if (id.startsWith('faa-reminder:')) {
+    chrome.tabs.create({ url: chrome.runtime.getURL('dashboard.html#schedule') });
     chrome.notifications.clear(notificationId);
   }
 });
@@ -98,5 +154,5 @@ chrome.action.onClicked.addListener(() => {
   chrome.tabs.create({ url: chrome.runtime.getURL('dashboard.html') });
 });
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-  if (message && message.type === 'PING') sendResponse({ ok: true, version: '0.7.2' });
+  if (message && message.type === 'PING') sendResponse({ ok: true, version: '0.7.3' });
 });

@@ -61,6 +61,8 @@ function loadBackground(options) {
       async create(options) { openedTabs.push(options); return { id: openedTabs.length }; }
     }
   };
+  if (settings.omitNotifications) delete chrome.notifications;
+
   const context = {
     chrome,
     FAACore: Core,
@@ -169,4 +171,15 @@ test('clicking a weekly report notification opens the analytics dashboard', asyn
   assert.equal(app.openedTabs.length, 1);
   assert.equal(app.openedTabs[0].url, 'chrome-extension://test/dashboard.html#analytics');
   assert.deepEqual(app.clearedNotifications, ['faa-weekly-report:weekly-2026-10-24']);
+});
+
+
+test('worker still registers the extension action when the optional notifications API is unavailable', async () => {
+  const app = loadBackground({ omitNotifications: true });
+  assert.equal(typeof app.listeners.action, 'function');
+  assert.equal(app.listeners.notificationClick, null);
+  app.listeners.action();
+  await new Promise(resolve => setTimeout(resolve, 0));
+  assert.equal(app.openedTabs.length, 1);
+  assert.equal(app.openedTabs[0].url, 'chrome-extension://test/dashboard.html');
 });

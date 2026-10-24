@@ -17,7 +17,7 @@
 
   function findComposer() {
     const candidates = Array.from(document.querySelectorAll(
-      'textarea, [contenteditable="true"], [role="textbox"], [data-lexical-editor="true"]'
+      'textarea, input[type="text"], input[role="textbox"], [contenteditable="true"], [role="textbox"], [data-lexical-editor="true"]'
     )).filter(element => {
       if (!visible(element) || element.disabled || element.getAttribute('aria-disabled') === 'true') return false;
       if (element.tagName === 'INPUT' && /search|email|password/i.test(element.type + ' ' + element.placeholder)) return false;

@@ -28,6 +28,7 @@ assert.ok(dashboard.includes('src/core.js'), 'core script must be loaded');
 assert.ok(dashboard.includes('src/ai-provider.js'), 'AI provider must be loaded');
 assert.ok(dashboard.includes('src/facebook-provider.js'), 'Facebook Pages provider must be loaded');
 assert.ok(!dashboard.includes('src/meta-ai-bridge.js'), 'Meta AI bridge is injected only after optional permission is granted');
+assert.ok(!dashboard.includes('src/facebook-page-bridge.js'), 'Facebook capture bridge is injected only after user action and optional permission');
 assert.ok(dashboard.includes('src/app.js'), 'app script must be loaded');
 assert.ok(dashboard.indexOf('src/core.js') < dashboard.indexOf('src/app.js'), 'core must load before app');
 assert.ok(dashboard.indexOf('src/ai-provider.js') < dashboard.indexOf('src/app.js'), 'AI provider must load before app');

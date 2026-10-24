@@ -15,6 +15,8 @@
       settings: { language: 'vi', speed: 'normal', provider: 'meta', model: '', groupLimit: 10, delay: 0, pageId: '', graphVersion: 'v26.0' },
       groups: [],
       contacts: [],
+      observations: [],
+      weeklyReports: [],
       profiles: [],
       tasks: [],
       logs: [],
@@ -29,7 +31,8 @@
         comment: 'Soạn một bình luận hữu ích, lịch sự cho ngữ cảnh sau: {content}',
         sales: 'Viết bài giới thiệu sản phẩm rõ lợi ích, không phóng đại hoặc thêm dữ kiện chưa cung cấp: {content}',
         feed: 'Tạo một bản tin ngắn dựa hoàn toàn trên thông tin được cung cấp: {content}',
-        summary: 'Tóm tắt các ý chính, không thêm thông tin ngoài nguồn: {content}'
+        summary: 'Tóm tắt các ý chính, không thêm thông tin ngoài nguồn: {content}',
+        profileAnalysis: 'Phân tích nội dung được cung cấp trong ngữ cảnh. Nêu chủ đề chính, sắc thái và quan điểm được thể hiện trực tiếp, vấn đề lặp lại và mức độ tương tác chỉ khi có số liệu. Không suy đoán thuộc tính nhạy cảm hoặc thông tin cá nhân không được nêu trực tiếp. Phân biệt dữ kiện với nhận định và nêu rõ giới hạn của nguồn. Nội dung: {content}'
       }
     };
   }
@@ -111,7 +114,7 @@
 
   function isValidState(value) {
     if (!isObject(value) || !isObject(value.settings) || !isObject(value.prompts)) return false;
-    const arrayKeys = ['groups', 'contacts', 'profiles', 'tasks', 'logs', 'drafts', 'pageSchedules', 'engagementItems'];
+    const arrayKeys = ['groups', 'contacts', 'observations', 'weeklyReports', 'profiles', 'tasks', 'logs', 'drafts', 'pageSchedules', 'engagementItems'];
     if (!arrayKeys.every(key => isBoundedArray(value[key]))) return false;
     if (!isObject(value.moduleNotes) && value.moduleNotes !== undefined) return false;
 
@@ -129,6 +132,7 @@
       isText(group.id, 100) && group.id.length > 0 &&
       isText(group.name, 200) && group.name.trim().length > 0 &&
       isSafeFacebookGroupUrl(group.url) && typeof group.selected === 'boolean')) return false;
+    if (value.observations.length > 1000 || value.weeklyReports.length > 104) return false;
     if (!value.contacts.every(contact => isObject(contact) &&
       isText(contact.id, 100) && contact.id.length > 0 &&
       isText(contact.name, 200) && contact.name.trim().length > 0 &&
@@ -136,6 +140,28 @@
       ['new', 'opened', 'request_sent', 'connected', 'follow_up', 'declined'].includes(contact.status) &&
       isText(contact.createdAt, 100) &&
       (contact.updatedAt === undefined || isText(contact.updatedAt, 100)))) return false;
+    if (!value.observations.every(item => isObject(item) &&
+      isText(item.id, 100) && item.id.length > 0 &&
+      isSafeFacebookUrl(item.sourceUrl) &&
+      isText(item.capturedAt, 100) && Number.isFinite(Date.parse(item.capturedAt)) &&
+      isText(item.text, 50000) && item.text.trim().length > 0 &&
+      (item.contactId === undefined || isText(item.contactId, 100)) &&
+      (item.contactName === undefined || isText(item.contactName, 200)) &&
+      (item.author === undefined || isText(item.author, 200)) &&
+      (item.visibleArticleCount === undefined || (Number.isInteger(item.visibleArticleCount) && item.visibleArticleCount >= 0 && item.visibleArticleCount <= 100)) &&
+      (item.analysisText === undefined || isText(item.analysisText, 20000)) &&
+      (item.analysisAt === undefined || (isText(item.analysisAt, 100) && Number.isFinite(Date.parse(item.analysisAt)))))) return false;
+    if (!value.weeklyReports.every(report => isObject(report) &&
+      isText(report.id, 100) && report.id.length > 0 &&
+      isText(report.periodStart, 100) && Number.isFinite(Date.parse(report.periodStart)) &&
+      isText(report.periodEnd, 100) && Number.isFinite(Date.parse(report.periodEnd)) &&
+      isText(report.createdAt, 100) && Number.isFinite(Date.parse(report.createdAt)) &&
+      isText(report.summary, 20000) &&
+      (report.aiSummary === undefined || isText(report.aiSummary, 20000)) &&
+      Number.isInteger(report.observationsCount) && report.observationsCount >= 0 && report.observationsCount <= 1000 &&
+      Number.isInteger(report.profilesCount) && report.profilesCount >= 0 && report.profilesCount <= 1000 &&
+      Number.isInteger(report.previousObservationsCount) && report.previousObservationsCount >= 0 && report.previousObservationsCount <= 1000 &&
+      (report.aiSummaryAt === undefined || (isText(report.aiSummaryAt, 100) && Number.isFinite(Date.parse(report.aiSummaryAt)))))) return false;
     if (!value.engagementItems.every(item => isObject(item) &&
       isText(item.id, 100) && item.id.length > 0 &&
       isText(item.name, 200) && item.name.trim().length > 0 &&
@@ -253,5 +279,49 @@
     }).join(',')).join('\r\n');
   }
 
-  return { createDefaultState, migrateState, escapeHtml, isSafeHttpsUrl, isSafeFacebookUrl, isSafeFacebookGroupUrl, isValidState, fillPrompt, parseCsv, toCsv };
+  function buildWeeklyReport(state, nowValue) {
+    const now = Number.isFinite(nowValue) ? nowValue : Date.now();
+    const periodEnd = new Date(now);
+    const periodStart = new Date(now - 7 * 24 * 60 * 60 * 1000);
+    const previousStart = new Date(now - 14 * 24 * 60 * 60 * 1000);
+    const observations = Array.isArray(state && state.observations) ? state.observations : [];
+    const current = observations.filter(item => {
+      const time = Date.parse(item.capturedAt);
+      return Number.isFinite(time) && time >= periodStart.getTime() && time <= now;
+    });
+    const previous = observations.filter(item => {
+      const time = Date.parse(item.capturedAt);
+      return Number.isFinite(time) && time >= previousStart.getTime() && time < periodStart.getTime();
+    });
+    const groups = new Map();
+    for (const item of current) {
+      const key = String(item.contactId || item.contactName || 'unassigned');
+      const label = String(item.contactName || (item.contactId ? 'Hồ sơ ' + item.contactId : 'Chưa gán hồ sơ')).slice(0, 200);
+      const entry = groups.get(key) || { label, count: 0 };
+      entry.count += 1;
+      groups.set(key, entry);
+    }
+    const ordered = Array.from(groups.values()).sort((a, b) => b.count - a.count || a.label.localeCompare(b.label));
+    const delta = current.length - previous.length;
+    const trend = delta > 0 ? 'tăng ' + delta + ' quan sát' : delta < 0 ? 'giảm ' + Math.abs(delta) + ' quan sát' : 'không đổi';
+    const profileSummary = ordered.length
+      ? ordered.slice(0, 10).map(item => item.label + ': ' + item.count).join('; ')
+      : 'Chưa có hồ sơ được gán';
+    const summary = current.length
+      ? 'Báo cáo 7 ngày (' + periodStart.toLocaleDateString('vi-VN') + ' – ' + periodEnd.toLocaleDateString('vi-VN') + '): ' + current.length + ' quan sát từ ' + groups.size + ' hồ sơ/nhóm định danh; ' + trend + ' so với 7 ngày trước (' + previous.length + ' quan sát). Phân bổ: ' + profileSummary + '. Báo cáo chỉ dựa trên nội dung người dùng chủ động thu thập và không suy đoán thuộc tính nhạy cảm.'
+      : 'Báo cáo 7 ngày (' + periodStart.toLocaleDateString('vi-VN') + ' – ' + periodEnd.toLocaleDateString('vi-VN') + '): chưa có quan sát nào trong kỳ. Có ' + previous.length + ' quan sát trong 7 ngày liền trước. Hãy mở một bài viết Facebook và chủ động thu thập nội dung hiển thị nếu bạn có quyền truy cập.';
+    return {
+      id: 'weekly-' + periodStart.toISOString().replace(/[:.]/g, '-'),
+      periodStart: periodStart.toISOString(),
+      periodEnd: periodEnd.toISOString(),
+      createdAt: periodEnd.toISOString(),
+      observationsCount: current.length,
+      profilesCount: groups.size,
+      previousObservationsCount: previous.length,
+      summary,
+      aiSummary: ''
+    };
+  }
+
+  return { createDefaultState, migrateState, escapeHtml, isSafeHttpsUrl, isSafeFacebookUrl, isSafeFacebookGroupUrl, isValidState, fillPrompt, parseCsv, toCsv, buildWeeklyReport };
 });

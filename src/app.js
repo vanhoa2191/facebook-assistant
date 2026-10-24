@@ -38,6 +38,7 @@
   let pageTokenPresent = false;
   let graphPermissionPresent = false;
   let metaWebPermissionPresent = false;
+  let metaWebLastSuccess = false;
   let metaWebStatus = '';
   let pageComposerDraft = '';
   let pagePublishStatus = '';
@@ -272,6 +273,25 @@
     };
     return generic(TITLES[page], descriptions[page] || 'Module đang chuẩn bị triển khai.');
   }
+  function updateConnectionStatus() {
+    const status = $('#connectionStatus');
+    if (!status) return;
+    let aiStatus;
+    if (state.settings.provider === 'gemini') {
+      aiStatus = aiKeyPresent && aiPermissionPresent ? 'Gemini API đã cấu hình' : 'Gemini API chưa cấu hình';
+    } else if (metaWebLastSuccess) {
+      aiStatus = 'Meta AI Web hoạt động';
+    } else if (metaWebPermissionPresent) {
+      aiStatus = 'Meta AI Web đã cấp quyền';
+    } else {
+      aiStatus = 'Meta AI Web chưa kiểm tra';
+    }
+    const pageStatus = pageTokenPresent && graphPermissionPresent
+      ? 'Facebook Page API đã cấu hình'
+      : 'Facebook Page API chưa cấu hình';
+    status.textContent = '● Chạy cục bộ · ' + aiStatus + ' · ' + pageStatus;
+    status.title = 'Meta AI Web và Facebook Page API là hai kết nối riêng. Cấu hình Page API chưa có nghĩa token đã được xác minh với Meta.';
+  }
   function render() {
     $('#sidebar').innerHTML = NAV.map(item =>
       '<button type="button" class="nav ' + (page === item[0] ? 'active' : '') + '" data-nav="' + item[0] + '"><span class="symbol" aria-hidden="true">' + item[1] + '</span><span>' + esc(item[2]) + '</span></button>'
@@ -279,6 +299,7 @@
     $('#pageTitle').textContent = TITLES[page];
     $('#pageDesc').textContent = DESCS[page] || 'Module đang chuẩn bị kết nối và kiểm thử.';
     $('#view').innerHTML = renderPage();
+    updateConnectionStatus();
   }
   function log(message) {
     state.logs.push({ at: new Date().toLocaleString('vi-VN'), message: String(message).slice(0, 2000) });
@@ -414,6 +435,7 @@
         pagePublishStatus = 'Đang nhờ Meta AI Web soạn bản nháp...';
         try {
           const output = await generateWithMetaAiWeb(prompt);
+          metaWebLastSuccess = true;
           pageComposerDraft = output;
           addDraft(output, '', 'ai');
           pagePublishStatus = 'Meta AI đã tạo bản nháp. Hãy xem lại nội dung trong ô bài viết; chưa có gì được đăng.';
@@ -719,6 +741,7 @@
         render();
         try {
           const output = await generateWithMetaAiWeb(prompt);
+          metaWebLastSuccess = true;
           addDraft(output, '', 'ai');
           metaWebStatus = 'Đã nhận câu trả lời và lưu thành bản nháp. Hãy xem lại trước khi sử dụng.';
           log('Đã nhận và lưu bản nháp từ Meta AI Web');
@@ -800,6 +823,7 @@
           if (!output) return;
           addDraft(output, '', 'ai');
           aiOutput = output;
+          if (state.settings.provider !== 'gemini') metaWebLastSuccess = true;
           metaWebStatus = state.settings.provider === 'gemini' ? aiOutput : 'Đã nhận và lưu bản nháp từ Meta AI Web.';
           log(state.settings.provider === 'gemini' ? 'Đã tạo nháp bằng Gemini' : 'Đã tạo nháp bằng Meta AI Web');
           break;
@@ -833,6 +857,7 @@
               : await generateWithMetaAiWeb(prompt);
             if (!output) return;
             addDraft(output, postUrl, 'share', group.url ? group : null);
+            if (state.settings.provider !== 'gemini') metaWebLastSuccess = true;
             created += 1;
             log('Đã tạo nháp lời dẫn' + (group.url ? ' cho nhóm ' + group.name : ''));
             await save();
@@ -1009,6 +1034,7 @@
             : await generateWithMetaAiWeb(prompt);
           if (!output) return;
           addDraft(output, '', 'ai');
+          if (state.settings.provider !== 'gemini') metaWebLastSuccess = true;
           log(state.settings.provider === 'gemini' ? 'Đã tạo bản nháp bằng Gemini: ' + TITLES[page] : 'Đã tạo bản nháp bằng Meta AI Web: ' + TITLES[page]);
           break;
         } catch (error) {

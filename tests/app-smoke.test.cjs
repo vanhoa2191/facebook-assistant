@@ -101,7 +101,7 @@ test('navigation opens the AI and sales modules without runtime errors', async (
   } } });
   assert.equal(elements['#pageTitle'].textContent, 'Kết bạn');
   assert.match(elements['#view'].innerHTML, /contactUrl/);
-  assert.match(elements['#view'].innerHTML, /Không tự gửi lời mời kết bạn/);
+  assert.match(elements['#view'].innerHTML, /không tự gửi lời mời kết bạn/i);
 
   click({ target: { closest(selector) {
     return selector === '[data-nav]' ? { dataset: { nav: 'ai' } } : null;
@@ -192,4 +192,5 @@ test('Meta AI draft moves through review queue and saves edits without publishin
   clickNav('review');
   assert.match(elements['#view'].innerHTML, /Nội dung đã được người dùng chỉnh sửa/);
   assert.match(elements['#view'].innerHTML, /Chờ duyệt/);
+  assert.match(elements['#view'].innerHTML, /Mở liên kết/);
 });

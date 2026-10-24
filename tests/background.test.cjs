@@ -125,7 +125,7 @@ test('clicking a reminder notification opens the dashboard and clears the notifi
   const app = loadBackground({ notificationsAllowed: true });
   await app.listeners.notificationClick('faa-reminder:task-1');
   assert.equal(app.openedTabs.length, 1);
-  assert.equal(app.openedTabs[0].url, 'chrome-extension://test/dashboard.html');
+  assert.equal(app.openedTabs[0].url, 'chrome-extension://test/dashboard.html#schedule');
   assert.deepEqual(app.clearedNotifications, ['faa-reminder:task-1']);
 });
 
@@ -138,7 +138,35 @@ test('startup restores alarms for future reminders and does not reschedule compl
   const app = loadBackground({ state, notificationsAllowed: true });
   app.listeners.startup();
   await new Promise(resolve => setTimeout(resolve, 0));
-  assert.equal(app.alarms.length, 1);
-  assert.equal(app.alarms[0].name, 'faa-task:future');
+  assert.equal(app.alarms.length, 2);
+  assert.ok(app.alarms.some(alarm => alarm.name === 'faa-task:future'));
+  assert.ok(app.alarms.some(alarm => alarm.name === 'faa-weekly-report'));
   assert.equal(app.notifications.length, 0);
+});
+
+
+test('weekly report alarm stores a local report and notifies without calling an AI provider', async () => {
+  const state = Core.createDefaultState();
+  state.observations.push({
+    id: 'weekly-observation', sourceUrl: 'https://www.facebook.com/posts/123',
+    capturedAt: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(),
+    text: 'Visible post and comments', contactId: 'contact-1', contactName: 'Alice'
+  });
+  const app = loadBackground({ state, notificationsAllowed: true });
+  await app.listeners.alarm({ name: 'faa-weekly-report' });
+
+  assert.equal(app.getState().weeklyReports.length, 1);
+  assert.equal(app.getState().weeklyReports[0].observationsCount, 1);
+  assert.match(app.getState().weeklyReports[0].summary, /Alice: 1/);
+  assert.equal(app.notifications.length, 1);
+  assert.match(app.notifications[0].id, /^faa-weekly-report:/);
+  assert.match(app.notifications[0].options.title, /Báo cáo tuần đã sẵn sàng/);
+});
+
+test('clicking a weekly report notification opens the analytics dashboard', async () => {
+  const app = loadBackground({ notificationsAllowed: true });
+  await app.listeners.notificationClick('faa-weekly-report:weekly-2026-10-24');
+  assert.equal(app.openedTabs.length, 1);
+  assert.equal(app.openedTabs[0].url, 'chrome-extension://test/dashboard.html#analytics');
+  assert.deepEqual(app.clearedNotifications, ['faa-weekly-report:weekly-2026-10-24']);
 });

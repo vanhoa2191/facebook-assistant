@@ -12,7 +12,7 @@
 
   function createDefaultState() {
     return {
-      settings: { language: 'vi', speed: 'normal', provider: 'demo', model: '', groupLimit: 10, delay: 30, pageId: '', graphVersion: 'v26.0' },
+      settings: { language: 'vi', speed: 'normal', provider: 'meta', model: '', groupLimit: 10, delay: 30, pageId: '', graphVersion: 'v26.0' },
       groups: [],
       profiles: [],
       tasks: [],

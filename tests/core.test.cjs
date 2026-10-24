@@ -211,3 +211,20 @@ test('draft review lifecycle accepts known states and rejects unknown states', (
   state.drafts[0].reviewStatus = 'auto-publish';
   assert.equal(Core.isValidState(state), false);
 });
+
+
+test('contact records validate Facebook URLs and known manual statuses', () => {
+  const state = Core.createDefaultState();
+  state.contacts.push({
+    id: 'c1', name: 'Potential contact',
+    url: 'https://www.facebook.com/profile.php?id=123456',
+    note: 'Shared professional interest', status: 'opened',
+    createdAt: '2026-10-24T10:00:00.000Z'
+  });
+  assert.equal(Core.isValidState(state), true);
+  state.contacts[0].status = 'auto-friend-request';
+  assert.equal(Core.isValidState(state), false);
+  state.contacts[0].status = 'connected';
+  state.contacts[0].url = 'https://evil.example/profile/123';
+  assert.equal(Core.isValidState(state), false);
+});

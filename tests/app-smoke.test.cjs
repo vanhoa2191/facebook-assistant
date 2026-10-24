@@ -8,7 +8,8 @@ const path = require('node:path');
 const Core = require('../src/core.js');
 const Gemini = require('../src/ai-provider.js');
 
-function loadApp() {
+function loadApp(options) {
+  const settings = options || {};
   const listeners = {};
   const elements = {};
   function makeElement(selector) {
@@ -28,6 +29,12 @@ function loadApp() {
   const window = {
     FAACore: Core,
     FAAAI: Gemini,
+    FAAFacebook: settings.facebookProvider || {
+      publishPagePost: async options => ({
+        id: '12345678_98765432', pageId: options.pageId, version: options.version,
+        scheduled: Boolean(options.scheduledPublishAt), scheduledAt: options.scheduledPublishAt || null
+      })
+    },
     confirm: () => true,
     prompt: () => null
   };
@@ -38,13 +45,22 @@ function loadApp() {
         set: async () => ({})
       },
       session: {
-        get: async () => ({}),
+        get: async key => {
+          if (!settings.pageToken) return {};
+          const token = { 'faa.facebookPageToken': 'test-page-token-12345' };
+          if (Array.isArray(key)) return token;
+          return key === 'faa.facebookPageToken' ? token : {};
+        },
         set: async () => ({}),
         remove: async () => ({})
       }
     },
     permissions: {
-      contains: async args => Array.isArray(args.permissions) && args.permissions.includes('scripting') && (args.origins || []).some(origin => origin.includes('meta.ai')),
+      contains: async args => {
+        if (Array.isArray(args.permissions)) return args.permissions.includes('scripting') && (args.origins || []).some(origin => origin.includes('meta.ai'));
+        if ((args.origins || []).some(origin => origin.includes('graph.facebook.com'))) return Boolean(settings.graphPermission);
+        return false;
+      },
       request: async () => false
     },
     tabs: {
@@ -193,4 +209,31 @@ test('Meta AI draft moves through review queue and saves edits without publishin
   assert.match(elements['#view'].innerHTML, /Nội dung đã được người dùng chỉnh sửa/);
   assert.match(elements['#view'].innerHTML, /Chờ duyệt/);
   assert.match(elements['#view'].innerHTML, /Mở liên kết/);
+});
+
+
+test('confirmed Page publishing records the result in the review queue', async () => {
+  const { elements, listeners } = loadApp({ graphPermission: true, pageToken: true });
+  await new Promise(resolve => setTimeout(resolve, 10));
+  const clickNav = nav => listeners['document:click']({ target: { closest(selector) {
+    return selector === '[data-nav]' ? { dataset: { nav } } : null;
+  } } });
+  const clickAction = (action, id) => listeners['document:click']({ target: { closest(selector) {
+    return selector === '[data-action]' ? { dataset: { action, id } } : null;
+  } } });
+
+  clickNav('pages');
+  elements['#pageId'] = { value: '12345678' };
+  elements['#graphVersion'] = { value: 'v26.0' };
+  elements['#pageMessage'] = { value: 'A reviewed Page post.' };
+  elements['#pageLink'] = { value: '' };
+  elements['#pagePublishTime'] = { value: '' };
+  clickAction('publishPagePost');
+  await new Promise(resolve => setTimeout(resolve, 30));
+  assert.match(elements['#view'].innerHTML, /Đăng thành công/);
+  assert.match(elements['#view'].innerHTML, /12345678_98765432/);
+
+  clickNav('review');
+  assert.match(elements['#view'].innerHTML, /Đã đăng/);
+  assert.match(elements['#view'].innerHTML, /12345678_98765432/);
 });

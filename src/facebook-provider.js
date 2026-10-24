@@ -10,6 +10,16 @@
   const DEFAULT_VERSION = 'v26.0';
   const MAX_MESSAGE_LENGTH = 60000;
 
+  function isSafeHttpsUrl(value) {
+    if (typeof value !== 'string' || !value.trim() || value.length > 2048) return false;
+    try {
+      const url = new URL(value);
+      return url.protocol === 'https:' && Boolean(url.hostname) && !url.username && !url.password;
+    } catch (_) {
+      return false;
+    }
+  }
+
   async function publishPagePost(options) {
     const settings = options || {};
     const pageId = typeof settings.pageId === 'string' ? settings.pageId.trim() : '';
@@ -25,11 +35,10 @@
     if (accessToken.length < 10 || accessToken.length > 500) throw new Error('Page access token chưa hợp lệ.');
     if (!message || message.length > MAX_MESSAGE_LENGTH) throw new Error('Nội dung bài viết phải có từ 1 đến 60.000 ký tự.');
     if (!/^v[0-9]{1,2}\.0$/.test(version)) throw new Error('Phiên bản Graph API không hợp lệ, ví dụ v26.0.');
-    if (link && (link.length > 2048 || !/^https:\/\/[^\s]+$/i.test(link))) throw new Error('Link đính kèm phải là URL HTTPS hợp lệ.');
+    if (link && !isSafeHttpsUrl(link)) throw new Error('Link đính kèm phải là URL HTTPS hợp lệ, không chứa thông tin đăng nhập.');
     if (!fetchImpl) throw new Error('Môi trường hiện tại không hỗ trợ fetch.');
 
     const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), timeoutMs);
     let scheduledAt = null;
     if (scheduledValue) {
       const parsed = new Date(scheduledValue);
@@ -41,6 +50,7 @@
       scheduledAt = Math.floor(timestamp / 1000);
     }
 
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
     const endpoint = API_ORIGIN + '/' + version + '/' + encodeURIComponent(pageId) + '/feed';
     const body = new URLSearchParams({ message, access_token: accessToken });
     if (link) body.set('link', link);

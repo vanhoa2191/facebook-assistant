@@ -126,6 +126,94 @@
       '</section><section class="panel blue"><h2>Ghi chú nghiệp vụ</h2><div class="field"><label for="moduleNote">Ghi chú nội bộ</label><textarea id="moduleNote" maxlength="2000" placeholder="Ghi yêu cầu cho module này...">' + esc(note) + '</textarea></div>' +
       button('Lưu ghi chú', 'saveNote', 'primary') + '</section></div>';
   }
+  function facebookIdFromUrl(value) {
+    if (!Core.isSafeFacebookUrl(value)) return '';
+    try {
+      const url = new URL(value);
+      const queryId = url.searchParams.get('id') || url.searchParams.get('profile_id');
+      if (queryId && /^[0-9]{1,30}$/.test(queryId)) return queryId;
+      const match = url.pathname.match(/^\/(\d{1,30})(?:\/|$)/);
+      return match ? match[1] : '';
+    } catch (_) {
+      return '';
+    }
+  }
+  function normalizeProfileUrl(value) {
+    if (!Core.isSafeFacebookUrl(value)) return '';
+    const facebookId = facebookIdFromUrl(value);
+    if (facebookId) return 'facebook-id:' + facebookId;
+    try {
+      const url = new URL(value);
+      return url.hostname.toLowerCase().replace(/^www\./, '') + url.pathname.replace(/\/+$/, '');
+    } catch (_) {
+      return '';
+    }
+  }
+  async function importContactsCsvFile(event) {
+    const file = event.target.files && event.target.files[0];
+    if (!file) return;
+    if (file.size > 5000000) { toast('Tệp CSV vượt quá 5 MB.'); event.target.value = ''; return; }
+    try {
+      const rows = Core.parseCsv((await file.text()).replace(/^\uFEFF/, ''));
+      if (!rows.length) throw new Error('CSV trống.');
+      const normalizeHeader = value => String(value || '').trim().toLowerCase()
+        .normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/đ/g, 'd');
+      const headers = rows[0].map(normalizeHeader);
+      const findHeader = aliases => headers.findIndex(value => aliases.includes(value));
+      const nameIndex = findHeader(['name', 'full name', 'profile name', 'ten', 'ho ten', 'ten nguoi', 'ten nguoi lien he']);
+      const urlIndex = findHeader(['url', 'profile url', 'facebook url', 'link', 'duong dan', 'link ho so']);
+      const idIndex = findHeader(['facebook id', 'profile id', 'id facebook', 'id', 'ma facebook']);
+      const hasHeader = nameIndex >= 0 || urlIndex >= 0 || idIndex >= 0;
+      const start = hasHeader ? 1 : 0;
+      const ni = nameIndex >= 0 ? nameIndex : 0;
+      const ui = urlIndex >= 0 ? urlIndex : 1;
+      const ii = idIndex >= 0 ? idIndex : 2;
+      state.contacts = Array.isArray(state.contacts) ? state.contacts : [];
+      let added = 0;
+      let updated = 0;
+      let skipped = 0;
+      for (const row of rows.slice(start)) {
+        let name = String(row[ni] || '').trim().slice(0, 200);
+        let url = String(row[ui] || '').trim().slice(0, 2048);
+        let facebookId = String(row[ii] || '').trim().slice(0, 100);
+        if (facebookId && !/^[0-9]{1,30}$/.test(facebookId)) { skipped += 1; continue; }
+        if (url && !Core.isSafeFacebookUrl(url)) { skipped += 1; continue; }
+        if (!facebookId && url) facebookId = facebookIdFromUrl(url);
+        if (!url && facebookId) url = 'https://www.facebook.com/profile.php?id=' + encodeURIComponent(facebookId);
+        if (!url) { skipped += 1; continue; }
+        if (!name) name = facebookId ? 'Facebook ID ' + facebookId : 'Hồ sơ Facebook';
+        const urlKey = normalizeProfileUrl(url);
+        let contact = state.contacts.find(item => urlKey && normalizeProfileUrl(item.url) === urlKey);
+        if (!contact && facebookId) contact = state.contacts.find(item =>
+          item.facebookId === facebookId || facebookIdFromUrl(item.url) === facebookId);
+        if (!contact && name) contact = state.contacts.find(item => item.name.trim().toLocaleLowerCase() === name.toLocaleLowerCase());
+        if (contact) {
+          contact.name = name || contact.name;
+          contact.url = url;
+          if (facebookId) contact.facebookId = facebookId;
+          contact.updatedAt = new Date().toISOString();
+          updated += 1;
+        } else {
+          if (state.contacts.length >= 1000) { skipped += 1; continue; }
+          state.contacts.push({
+            id: crypto.randomUUID(), name, url, facebookId,
+            note: 'Nhập từ danh sách đối chiếu CSV',
+            status: 'new', createdAt: new Date().toISOString()
+          });
+          added += 1;
+        }
+      }
+      log('Đối chiếu liên hệ CSV: thêm ' + added + ', cập nhật ' + updated + ', bỏ qua ' + skipped + '.');
+      await save();
+      render();
+      toast('Đối chiếu xong: thêm ' + added + ', cập nhật ' + updated + ', bỏ qua ' + skipped + '.');
+    } catch (error) {
+      toast('Không thể nhập CSV: ' + error.message);
+    } finally {
+      event.target.value = '';
+    }
+  }
+
   function renderConnect() {
     const statusNames = { new: 'Chưa liên hệ', opened: 'Đã mở hồ sơ', request_sent: 'Đã gửi lời mời (đánh dấu thủ công)', connected: 'Đã kết nối', follow_up: 'Cần theo dõi', declined: 'Không tiếp tục' };
     const contacts = (state.contacts || []).slice().reverse();

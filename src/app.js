@@ -8,6 +8,7 @@
   const GEMINI_KEY = 'faa.geminiApiKey';
   const GRAPH_ORIGIN = 'https://graph.facebook.com/*';
   const PAGE_TOKEN_KEY = 'faa.facebookPageToken';
+  const META_AI_ORIGINS = ['https://meta.ai/*', 'https://www.meta.ai/*'];
   const NAV = [
     ['connect', '♧', 'Kết bạn'], ['scrape', '▤', 'Cào bài'], ['groups', '♧', 'Nhóm'],
     ['pages', '⚑', 'Nuôi Page'], ['share', '↗', 'Share bài'], ['sales', '▣', 'Đăng bán'],
@@ -36,6 +37,9 @@
   let aiOutput = '';
   let pageTokenPresent = false;
   let graphPermissionPresent = false;
+  let metaWebPermissionPresent = false;
+  let metaWebStatus = '';
+  let pageComposerDraft = '';
   let pagePublishStatus = '';
   let draftQuery = '';
   let draftKindFilter = 'all';
@@ -65,6 +69,7 @@
       '<div class="btnrow">' + button('Sao chép', 'copyDraft', '', draft.id) + button('Sửa', 'editDraft', '', draft.id) +
       (draft.url && Core.isSafeFacebookUrl(draft.url) ? button('Mở bài gốc', 'openDraftSource', '', draft.id) : '') +
       (draft.targetGroupUrl ? button('Mở nhóm', 'openDraftGroup', '', draft.id) : '') +
+      button('Dùng cho Page', 'useDraftForPage', '', draft.id) +
       button('Xóa', 'deleteDraft', 'warn', draft.id) + '</div></article>'
     ).join('') + '</div>';
   }
@@ -103,7 +108,7 @@
     return '<div class="grid"><section class="panel blue"><h2>' + esc(title) + '</h2><p>' + esc(description) + '</p>' +
       '<div class="field"><label for="modulePrompt">Prompt</label><textarea id="modulePrompt" maxlength="20000">' + esc(prompt) + '</textarea></div>' +
       '<div class="field"><label for="moduleInput">' + esc(inputLabel) + '</label><textarea id="moduleInput" maxlength="20000" placeholder="Dán nội dung hoặc nhập yêu cầu..."></textarea></div>' +
-      '<div class="btnrow">' + button('Tạo nháp bằng Gemini', 'generateModuleDraft', 'primary') + button('Sao chép prompt', 'copyModulePrompt') + '</div>' +
+      '<div class="btnrow">' + button(state.settings.provider === 'gemini' ? 'Tạo nháp bằng Gemini' : 'Tạo nháp bằng Meta AI Web', 'generateModuleDraft', 'primary') + button('Sao chép prompt', 'copyModulePrompt') + '</div>' +
       '<div class="field"><label for="moduleOutput">Kết quả từ Meta AI hoặc AI bên ngoài</label><textarea id="moduleOutput" maxlength="20000" placeholder="Dán kết quả AI đã tạo ở bên ngoài..."></textarea></div>' +
       '<div class="btnrow">' + button('Lưu kết quả AI thành nháp', 'saveModuleOutputDraft') + button('Lưu nội dung nguồn', 'saveModuleDraft') + '</div>' +
       '<div class="banner">' + esc(safetyNote) + ' Bạn có thể sao chép prompt sang Meta AI hoặc công cụ khác rồi dán kết quả tại đây.</div><h3>Nháp gần đây</h3>' + draftList(4) +
@@ -137,25 +142,30 @@
   }
 
   function renderAI() {
-    const options = [['demo', 'Demo (không gửi dữ liệu)'], ['gemini', 'Gemini API'], ['meta', 'Meta AI (chưa có API kết nối)']];
+    const options = [['meta', 'Meta AI Web (giao diện trình duyệt, không API)'], ['gemini', 'Gemini API'], ['demo', 'Demo']];
     const prompt = state.prompts.general || 'Hãy biên tập nội dung sau, không thêm dữ kiện: {content}';
-    return '<div class="grid"><section class="panel blue"><h2>Hồ sơ AI dùng chung</h2><p>Chọn cấu hình mặc định</p><div class="field"><label for="provider">Provider</label><select id="provider">' + options.map(o => '<option value="' + o[0] + '" ' + (state.settings.provider === o[0] ? 'selected' : '') + '>' + o[1] + '</option>').join('') + '</select></div>' +
-      field('Model Gemini', 'model', state.settings.model || 'gemini-2.5-flash') +
-      '<div class="field"><label for="geminiApiKey">Gemini API key (chỉ lưu trong phiên Chrome)</label><input id="geminiApiKey" type="password" maxlength="500" autocomplete="new-password" placeholder="Dán API key của bạn"></div>' +
-      '<div class="btnrow">' + button('Lưu khóa trong phiên', 'saveGeminiKey', 'primary') + button('Xóa khóa', 'clearGeminiKey', 'warn') + '</div>' +
-      '<div class="btnrow">' + button('Cấp quyền Gemini API', 'requestGeminiPermission') + button('Kiểm tra kết nối', 'testGemini') + '</div>' +
-      '<div class="banner">Khóa API chỉ lưu trong chrome.storage.session, không xuất ra file cấu hình và sẽ mất khi phiên trình duyệt kết thúc. Khi tạo nội dung, văn bản sẽ được gửi tới Google Gemini.</div>' +
-      '<div class="status-box"><span class="pill">' + (aiPermissionPresent ? 'Đã cấp quyền API' : 'Chưa cấp quyền API') + '</span> <span class="pill">' + (aiKeyPresent ? 'Đã có khóa trong phiên' : 'Chưa lưu khóa') + '</span></div>' +
-      '<div id="aiOutput" class="placeholder output">' + esc(aiOutput || 'Kết quả kiểm tra hoặc nội dung AI sẽ hiển thị tại đây.') + '</div>' +
-      button('Lưu cấu hình AI', 'saveSettings', 'primary') +
+    return '<div class="grid"><section class="panel blue"><h2>Hồ sơ AI dùng chung</h2><p>Chọn AI mặc định cho các module soạn nội dung</p><div class="field"><label for="provider">AI Provider</label><select id="provider">' + options.map(o => '<option value="' + o[0] + '" ' + (state.settings.provider === o[0] ? 'selected' : '') + '>' + o[1] + '</option>').join('') + '</select></div>' +
+      field('Model Gemini (chỉ dùng khi chọn Gemini)', 'model', state.settings.model || 'gemini-2.5-flash') +
+      '<div class="field"><label for="geminiApiKey">Gemini API key (không bắt buộc)</label><input id="geminiApiKey" type="password" maxlength="500" autocomplete="new-password" placeholder="Chỉ cần nếu chọn Gemini API"></div>' +
+      '<div class="btnrow">' + button('Lưu khóa Gemini', 'saveGeminiKey', 'primary') + button('Xóa khóa Gemini', 'clearGeminiKey', 'warn') + '</div>' +
+      '<div class="btnrow">' + button('Cấp quyền Gemini API', 'requestGeminiPermission') + button('Kiểm tra Gemini', 'testGemini') + '</div>' +
+      '<div class="status-box"><span class="pill">' + (aiPermissionPresent ? 'Gemini đã được cấp quyền' : 'Gemini chưa cấp quyền') + '</span> <span class="pill">' + (aiKeyPresent ? 'Đã có khóa Gemini' : 'Chưa có khóa Gemini') + '</span></div>' +
+      '<div class="banner">Meta AI Web là lựa chọn mặc định, không cần API key. Gemini là tùy chọn riêng. Chỉ gửi dữ liệu khi bạn bấm nút tạo nội dung.</div>' +
+      '<h3>Meta AI Web — tự động qua giao diện trình duyệt</h3><p>Extension sẽ mở meta.ai, điền prompt, gửi trong cuộc trò chuyện đang mở và đọc câu trả lời để lưu thành nháp. Bạn cần đăng nhập Meta AI trước nếu được yêu cầu.</p>' +
+      '<div class="status-box"><span class="pill">' + (metaWebPermissionPresent ? 'Đã cấp quyền Meta AI Web' : 'Chưa cấp quyền Meta AI Web') + '</span></div>' +
+      '<div class="btnrow">' + button('Cấp quyền và mở Meta AI', 'requestMetaWebPermission', 'primary') + button('Mở Meta AI Web', 'openMetaAiWeb') + '</div>' +
+      '<div class="field"><label for="metaWebPrompt">Prompt Meta AI Web — có thể dùng {content}</label><textarea id="metaWebPrompt" maxlength="20000">' + esc(prompt) + '</textarea></div>' +
+      '<div class="field"><label for="metaWebInput">Nội dung / yêu cầu đầu vào</label><textarea id="metaWebInput" maxlength="20000" placeholder="Mô tả bài viết hoặc yêu cầu cho Meta AI..."></textarea></div>' +
+      '<div class="btnrow">' + button('Gửi sang Meta AI Web và lưu nháp', 'generateMetaWebDraft', 'primary') + button('Sao chép prompt', 'copyMetaWebPrompt') + '</div>' +
+      '<div class="placeholder output">' + esc(metaWebStatus || 'Chưa có kết quả Meta AI Web.') + '</div>' +
       '<h3>Hồ sơ theo chức năng</h3>' + (state.profiles.map(p => '<div class="log"><strong>' + esc(p.name) + '</strong> · ' + esc(p.provider) + (p.model ? ' · ' + esc(p.model) : '') + ' ' + button('Dùng hồ sơ', 'useProfile', 'primary compact', p.id) + ' ' + button('Xóa', 'deleteProfile', 'warn compact', p.id) + '</div>').join('') || '<div class="placeholder">Chưa có hồ sơ.</div>') +
       field('Tên hồ sơ mới', 'profileName', '') + button('Thêm hồ sơ', 'addProfile') +
-      '</section><section class="panel purple"><h2>Soạn nội dung với AI</h2><p>Tạo nháp để đọc và chỉnh sửa trước khi sử dụng</p>' +
+      '</section><section class="panel purple"><h2>Soạn nội dung với AI</h2><p>Kết quả được lưu thành bản nháp để bạn duyệt</p>' +
       '<div class="field"><label for="aiPrompt">Prompt</label><textarea id="aiPrompt" maxlength="20000">' + esc(prompt) + '</textarea></div>' +
       '<div class="field"><label for="aiInput">Nội dung đầu vào</label><textarea id="aiInput" maxlength="20000" placeholder="Dán nội dung, chủ đề hoặc yêu cầu..."></textarea></div>' +
-      '<div class="btnrow">' + button('Tạo nháp bằng Gemini', 'generateAiDraft', 'primary') + button('Sao chép prompt', 'copyAiPrompt') + '</div>' +
-      '<div class="field"><label for="aiExternalOutput">Kết quả từ Meta AI hoặc AI bên ngoài</label><textarea id="aiExternalOutput" maxlength="20000" placeholder="Dán kết quả AI đã tạo ở bên ngoài..."></textarea></div>' +
-      '<div class="btnrow">' + button('Lưu kết quả AI thành nháp', 'saveExternalAiDraft') + button('Lưu nguyên văn đầu vào', 'saveAiDraft') + '</div>' +
+      '<div class="btnrow">' + button(state.settings.provider === 'gemini' ? 'Tạo nháp bằng Gemini' : 'Tạo nháp bằng Meta AI Web', 'generateAiDraft', 'primary') + button('Sao chép prompt', 'copyAiPrompt') + '</div>' +
+      '<div class="field"><label for="aiExternalOutput">Kết quả AI bên ngoài (nếu cần)</label><textarea id="aiExternalOutput" maxlength="20000" placeholder="Có thể dán kết quả thủ công..."></textarea></div>' +
+      '<div class="btnrow">' + button('Lưu kết quả thành nháp', 'saveExternalAiDraft') + button('Lưu nguyên văn đầu vào', 'saveAiDraft') + '</div>' +
       '<h3>Nháp gần đây</h3>' + draftList(5) + '</section></div>';
   }
   function renderPages() {
@@ -167,7 +177,9 @@
       '<div class="btnrow">' + button('Cấp quyền Graph API', 'requestGraphPermission') + '</div>' +
       '<div class="status-box"><span class="pill">' + (graphPermissionPresent ? 'Đã cấp quyền Graph API' : 'Chưa cấp quyền Graph API') + '</span> <span class="pill">' + (pageTokenPresent ? 'Đã có token trong phiên' : 'Chưa lưu token') + '</span></div>' +
       '<div class="banner">Cần Page access token hợp lệ và quyền pages_manage_posts do Meta cấp cho ứng dụng của bạn. Token không được xuất ra file cấu hình hoặc ghi vào nhật ký. Khi đăng bài, nội dung được gửi tới Meta.</div>' +
-      '<div class="field"><label for="pageMessage">Nội dung bài viết</label><textarea id="pageMessage" maxlength="60000" placeholder="Kiểm tra kỹ nội dung trước khi đăng công khai..."></textarea></div>' +
+      '<div class="field"><label for="pageAiBrief">Mô tả để Meta AI soạn bài</label><textarea id="pageAiBrief" maxlength="10000" placeholder="Mục tiêu, đối tượng, ý chính, ưu đãi..."></textarea></div>' +
+      button('Soạn bài bằng Meta AI Web', 'generateMetaPageDraft', 'primary full') +
+      '<div class="field"><label for="pageMessage">Nội dung bài viết — xem lại trước khi duyệt đăng</label><textarea id="pageMessage" maxlength="60000" placeholder="Kiểm tra kỹ nội dung trước khi đăng công khai...">' + esc(pageComposerDraft) + '</textarea></div>' +
       field('Link đính kèm (không bắt buộc, HTTPS)', 'pageLink', '') +
       field('Thời điểm đăng (để trống để đăng ngay)', 'pagePublishTime', '', 'datetime-local') +
       button('Đăng ngay / lên lịch trên Page', 'publishPagePost', 'primary full') +
@@ -181,7 +193,7 @@
       field('Link bài viết Facebook (không bắt buộc)', 'postUrl', '') +
       '<div class="field"><label for="sharePrompt">Prompt — dùng {postText} và {groupName}</label><textarea id="sharePrompt" maxlength="20000">' + esc(state.prompts.share) + '</textarea></div>' +
       '<div class="field"><label for="postText">Nội dung bài gốc</label><textarea id="postText" maxlength="20000" placeholder="Dán nội dung bạn được phép sử dụng"></textarea></div>' +
-      '<div class="btnrow">' + button('Tạo lời dẫn bằng Gemini', 'generateShareDraft', 'primary') + button('Sao chép prompt', 'copySharePrompt') + '</div>' +
+      '<div class="btnrow">' + button(state.settings.provider === 'gemini' ? 'Tạo lời dẫn bằng Gemini' : 'Tạo lời dẫn bằng Meta AI Web', 'generateShareDraft', 'primary') + button('Sao chép prompt', 'copySharePrompt') + '</div>' +
       '<div class="field"><label for="shareExternalOutput">Kết quả từ Meta AI hoặc AI bên ngoài</label><textarea id="shareExternalOutput" maxlength="20000" placeholder="Dán lời dẫn đã tạo ở bên ngoài..."></textarea></div>' +
       '<div class="btnrow">' + button('Lưu kết quả thành nháp chia sẻ', 'saveExternalShareDraft') + button('Lưu nội dung nguồn', 'saveShare') + '</div>' +
       '<div class="banner">Tạo tối đa 5 bản nháp mỗi lượt để kiểm soát chi phí AI. Mỗi bản nháp gắn với một nhóm; bạn cần tự xem lại và đăng thủ công.</div></section>' +
@@ -282,6 +294,7 @@
       pageTokenPresent = typeof stored[PAGE_TOKEN_KEY] === 'string' && stored[PAGE_TOKEN_KEY].length > 0;
       aiPermissionPresent = await chrome.permissions.contains({ origins: [GEMINI_ORIGIN] });
       graphPermissionPresent = await chrome.permissions.contains({ origins: [GRAPH_ORIGIN] });
+      metaWebPermissionPresent = await chrome.permissions.contains({ permissions: ['scripting'], origins: META_AI_ORIGINS });
     } catch (_) {
       aiKeyPresent = false;
       pageTokenPresent = false;
@@ -289,6 +302,60 @@
       graphPermissionPresent = false;
     }
   }
+  function waitForMetaTabReady(tabId, timeoutMs) {
+    return new Promise((resolve, reject) => {
+      let settled = false;
+      const finish = (error, tab) => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(timer);
+        chrome.tabs.onUpdated.removeListener(onUpdated);
+        if (error) reject(error); else resolve(tab);
+      };
+      const onUpdated = (updatedId, changeInfo, tab) => {
+        if (updatedId === tabId && changeInfo.status === 'complete') finish(null, tab);
+      };
+      const timer = setTimeout(() => finish(new Error('Meta AI Web chưa tải xong. Hãy kiểm tra tab và thử lại.')), timeoutMs || 45000);
+      chrome.tabs.onUpdated.addListener(onUpdated);
+      chrome.tabs.get(tabId).then(tab => {
+        if (tab.status === 'complete') finish(null, tab);
+      }).catch(() => {});
+    });
+  }
+
+  async function ensureMetaAiWebTab() {
+    const permission = await chrome.permissions.contains({ permissions: ['scripting'], origins: META_AI_ORIGINS });
+    if (!permission) throw new Error('Hãy bấm “Cấp quyền và mở Meta AI” trước khi tự động gửi prompt.');
+    let tabs = await chrome.tabs.query({ url: META_AI_ORIGINS });
+    let tab = tabs.find(item => item.id != null && /^https:\/\/(www\.)?meta\.ai\//i.test(item.url || ''));
+    if (!tab) {
+      tab = await chrome.tabs.create({ url: 'https://www.meta.ai/' });
+      tab = await waitForMetaTabReady(tab.id, 45000);
+    } else if (tab.status !== 'complete') {
+      tab = await waitForMetaTabReady(tab.id, 45000);
+    }
+    if (!tab || !tab.id || !/^https:\/\/(www\.)?meta\.ai\//i.test(tab.url || '')) {
+      throw new Error('Tab chưa ở trên meta.ai. Hãy mở trang Meta AI chính thức rồi thử lại.');
+    }
+    await chrome.scripting.executeScript({ target: { tabId: tab.id }, files: ['src/meta-ai-bridge.js'] });
+    return tab.id;
+  }
+
+  async function generateWithMetaAiWeb(prompt) {
+    if (typeof prompt !== 'string' || !prompt.trim() || prompt.length > 20000) {
+      throw new Error('Prompt Meta AI phải có từ 1 đến 20.000 ký tự.');
+    }
+    const tabId = await ensureMetaAiWebTab();
+    const response = await chrome.tabs.sendMessage(tabId, {
+      type: 'FAA_META_AI_WEB_GENERATE',
+      prompt: 'Xử lý yêu cầu sau như một tác vụ độc lập. Không tham chiếu hoặc dựa vào các yêu cầu trước trong cuộc trò chuyện nếu không được nêu lại.\n\n' + prompt.trim()
+    });
+    if (!response || !response.ok || typeof response.text !== 'string' || !response.text.trim()) {
+      throw new Error(response && response.error || 'Không nhận được câu trả lời từ Meta AI Web.');
+    }
+    return response.text.trim().slice(0, 20000);
+  }
+
   async function geminiRequest(prompt) {
     if (state.settings.provider !== 'gemini') { toast('Hãy chọn Gemini API trong Provider trước.'); return null; }
     if (!await chrome.permissions.contains({ origins: [GEMINI_ORIGIN] })) { toast('Hãy cấp quyền Gemini API trước khi gửi yêu cầu.'); return null; }
@@ -338,6 +405,38 @@
         state.settings.model = $('#model') ? $('#model').value.trim().slice(0, 120) : state.settings.model;
         log('Đã lưu cấu hình');
         break;
+      }
+      case 'generateMetaPageDraft': {
+        const brief = $('#pageAiBrief').value.trim();
+        if (!brief || brief.length > 10000) { toast('Nhập mô tả bài viết cho Meta AI trước.'); return; }
+        const prompt = 'Hãy viết một bài đăng Facebook Page bằng tiếng Việt dựa trên thông tin đã cung cấp. Không bịa dữ kiện, không tự thêm giá hoặc cam kết chưa được nêu. Viết rõ ràng, tự nhiên, có lời kêu gọi hành động phù hợp nhưng không gây hiểu lầm. Trả về chỉ nội dung bài đăng, không giải thích quy trình.\n\nThông tin đầu vào:\n' + brief;
+        pagePublishStatus = 'Đang nhờ Meta AI Web soạn bản nháp...';
+        try {
+          const output = await generateWithMetaAiWeb(prompt);
+          pageComposerDraft = output;
+          addDraft(output, '', 'ai');
+          pagePublishStatus = 'Meta AI đã tạo bản nháp. Hãy xem lại nội dung trong ô bài viết; chưa có gì được đăng.';
+          log('Đã tạo bản nháp Page bằng Meta AI Web');
+          await save();
+          render();
+          toast('Đã tạo nháp Page bằng Meta AI. Chưa đăng bài.');
+        } catch (error) {
+          pagePublishStatus = error.message;
+          log('Soạn bài Page bằng Meta AI Web thất bại: ' + error.message);
+          await save();
+          render();
+          toast(error.message);
+        }
+        return;
+      }
+      case 'useDraftForPage': {
+        const draft = state.drafts.find(item => item.id === id);
+        if (!draft) { toast('Không tìm thấy bản nháp.'); return; }
+        pageComposerDraft = draft.text;
+        page = 'pages';
+        render();
+        toast('Đã đưa bản nháp vào trình soạn Page. Hãy kiểm tra và duyệt trước khi đăng.');
+        return;
       }
       case 'savePageToken': {
         const pageId = $('#pageId').value.trim();
@@ -574,6 +673,66 @@
         state.profiles = state.profiles.filter(profile => profile.id !== id);
         log('Đã xóa hồ sơ AI');
         break;
+      case 'requestMetaWebPermission': {
+        const granted = await chrome.permissions.request({ permissions: ['scripting'], origins: META_AI_ORIGINS });
+        metaWebPermissionPresent = granted;
+        if (!granted) { toast('Chưa cấp quyền Meta AI Web.'); return; }
+        try {
+          const tabs = await chrome.tabs.query({ url: META_AI_ORIGINS });
+          if (tabs.length) {
+            await chrome.tabs.update(tabs[0].id, { active: true });
+          } else {
+            await chrome.tabs.create({ url: 'https://www.meta.ai/' });
+          }
+          log('Đã cấp quyền và mở Meta AI Web');
+          await save();
+          toast('Đã mở Meta AI Web. Hãy đăng nhập nếu được yêu cầu; sau đó quay lại extension để tạo nội dung.');
+        } catch (_) {
+          toast('Đã cấp quyền nhưng không mở được Meta AI Web.');
+        }
+        render();
+        return;
+      }
+      case 'openMetaAiWeb':
+        await chrome.tabs.create({ url: 'https://www.meta.ai/' });
+        toast('Đã mở Meta AI Web trong tab mới.');
+        return;
+      case 'copyMetaWebPrompt': {
+        const template = $('#metaWebPrompt').value.trim();
+        const input = $('#metaWebInput').value.trim();
+        let prompt = Core.fillPrompt(template, { content: input });
+        if (input && !template.includes('{content}')) prompt += '\n\nNội dung đầu vào:\n' + input;
+        try {
+          await navigator.clipboard.writeText(prompt);
+          toast('Đã sao chép prompt Meta AI Web.');
+        } catch (_) { toast('Không sao chép được prompt.'); }
+        return;
+      }
+      case 'generateMetaWebDraft': {
+        const template = $('#metaWebPrompt').value.trim();
+        const input = $('#metaWebInput').value.trim();
+        if (!input || input.length > 20000) { toast('Nhập nội dung đầu vào trước khi gửi Meta AI.'); return; }
+        let prompt = Core.fillPrompt(template, { content: input });
+        if (!template.includes('{content}')) prompt += '\n\nNội dung đầu vào:\n' + input;
+        metaWebStatus = 'Đang gửi yêu cầu tới Meta AI Web...';
+        render();
+        try {
+          const output = await generateWithMetaAiWeb(prompt);
+          addDraft(output, '', 'ai');
+          metaWebStatus = 'Đã nhận câu trả lời và lưu thành bản nháp. Hãy xem lại trước khi sử dụng.';
+          log('Đã nhận và lưu bản nháp từ Meta AI Web');
+          await save();
+          render();
+          toast('Meta AI đã trả lời; bản nháp đã được lưu.');
+        } catch (error) {
+          metaWebStatus = error.message;
+          log('Meta AI Web thất bại: ' + error.message);
+          await save();
+          render();
+          toast(error.message);
+        }
+        return;
+      }
       case 'saveGeminiKey': {
         const input = $('#geminiApiKey').value.trim();
         if (input.length < 10 || input.length > 500) { toast('API key phải có từ 10 đến 500 ký tự'); return; }
@@ -634,11 +793,14 @@
         let prompt = Core.fillPrompt(state.prompts.general, { content: input });
         if (!state.prompts.general.includes('{content}')) prompt += '\n\nNội dung cần xử lý:\n' + input;
         try {
-          const output = await geminiRequest(prompt);
+          const output = state.settings.provider === 'gemini'
+            ? await geminiRequest(prompt)
+            : await generateWithMetaAiWeb(prompt);
           if (!output) return;
           addDraft(output, '', 'ai');
           aiOutput = output;
-          log('Đã tạo nháp bằng Gemini');
+          metaWebStatus = state.settings.provider === 'gemini' ? aiOutput : 'Đã nhận và lưu bản nháp từ Meta AI Web.';
+          log(state.settings.provider === 'gemini' ? 'Đã tạo nháp bằng Gemini' : 'Đã tạo nháp bằng Meta AI Web');
           break;
         } catch (error) {
           log('Gemini lỗi khi tạo nháp: ' + error.message);
@@ -665,7 +827,9 @@
           if (!state.prompts.share.includes('{postText}')) prompt += '\n\nNội dung bài gốc:\n' + postText;
           if (!state.prompts.share.includes('{groupName}')) prompt += '\n\nNgữ cảnh nhóm: ' + group.name;
           try {
-            const output = await geminiRequest(prompt);
+            const output = state.settings.provider === 'gemini'
+              ? await geminiRequest(prompt)
+              : await generateWithMetaAiWeb(prompt);
             if (!output) return;
             addDraft(output, postUrl, 'share', group.url ? group : null);
             created += 1;
@@ -839,10 +1003,12 @@
         let prompt = Core.fillPrompt(state.prompts[promptKey], { content: input });
         if (!state.prompts[promptKey].includes('{content}')) prompt += '\n\nNội dung được cung cấp:\n' + input;
         try {
-          const output = await geminiRequest(prompt);
+          const output = state.settings.provider === 'gemini'
+            ? await geminiRequest(prompt)
+            : await generateWithMetaAiWeb(prompt);
           if (!output) return;
           addDraft(output, '', 'ai');
-          log('Đã tạo bản nháp bằng Gemini: ' + TITLES[page]);
+          log(state.settings.provider === 'gemini' ? 'Đã tạo bản nháp bằng Gemini: ' + TITLES[page] : 'Đã tạo bản nháp bằng Meta AI Web: ' + TITLES[page]);
           break;
         } catch (error) {
           log('Gemini lỗi tại module ' + TITLES[page] + ': ' + error.message);

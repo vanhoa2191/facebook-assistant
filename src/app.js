@@ -212,7 +212,7 @@
         (draft.rejectionReason ? '<div class="banner">Lý do từ chối: ' + esc(draft.rejectionReason) + '</div>' : '') +
         '<p class="draft-text">' + esc(draft.text.slice(0, 1600)) + (draft.text.length > 1600 ? '…' : '') + '</p>' +
         (draft.postId ? '<small>Post ID: ' + esc(draft.postId) + (draft.pageId ? ' · Page ID: ' + esc(draft.pageId) : '') + '</small>' : '') +
-        '<div class="btnrow">' + button('Sao chép', 'copyDraft', '', draft.id) + button('Sửa', 'editDraft', '', draft.id) +
+        '<div class="btnrow">' + (Core.isSafeFacebookUrl(draft.sourceUrl || draft.url) ? button('Mở liên kết', 'openDraftSource', '', draft.id) : '') + button('Sao chép', 'copyDraft', '', draft.id) + button('Sửa', 'editDraft', '', draft.id) +
         (canReview ? button(status === 'approved' ? 'Tiếp tục duyệt Page' : 'Duyệt & soạn Page', 'reviewDraft', 'primary', draft.id) : '') +
         (['draft', 'approved', 'failed'].includes(status) ? button('Từ chối', 'rejectDraft', 'warn', draft.id) : '') +
         (['rejected', 'failed'].includes(status) ? button('Đưa về chờ duyệt', 'reopenDraft', '', draft.id) : '') +
@@ -289,7 +289,7 @@
       const matchesKind = draftKindFilter === 'all' || kind === draftKindFilter;
       const matchesQuery = !query || draft.text.toLowerCase().includes(query) ||
         String(draft.targetGroupName || '').toLowerCase().includes(query) ||
-        String(draft.url || '').toLowerCase().includes(query);
+        String(draft.url || '').toLowerCase().includes(query) || String(draft.sourceUrl || '').toLowerCase().includes(query);
       return matchesKind && matchesQuery;
     });
     const library = filtered.length

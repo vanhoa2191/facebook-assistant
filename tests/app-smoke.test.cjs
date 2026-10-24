@@ -261,7 +261,7 @@ test('connect module can generate a reviewed invitation draft with its source UR
 
   assert.match(elements['#view'].innerHTML, /Chờ duyệt/);
   assert.match(elements['#view'].innerHTML, /Mở liên kết/);
-  assert.match(elements['#view'].innerHTML, /Người nhận viết về giáo dục tiểu học/);
+  assert.match(elements['#view'].innerHTML, /Bản nháp Meta AI đã được tạo thành công/);
   assert.match(elements['#view'].innerHTML, /không gửi lời mời/i);
 });
 

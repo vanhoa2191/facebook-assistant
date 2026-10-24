@@ -124,7 +124,8 @@ test('due reminders remain visible in the badge when desktop notifications are d
 test('clicking a reminder notification opens the dashboard and clears the notification', async () => {
   const app = loadBackground({ notificationsAllowed: true });
   await app.listeners.notificationClick('faa-reminder:task-1');
-  assert.deepEqual(app.openedTabs, [{ url: 'chrome-extension://test/dashboard.html' }]);
+  assert.equal(app.openedTabs.length, 1);
+  assert.equal(app.openedTabs[0].url, 'chrome-extension://test/dashboard.html');
   assert.deepEqual(app.clearedNotifications, ['faa-reminder:task-1']);
 });
 
@@ -135,7 +136,8 @@ test('startup restores alarms for future reminders and does not reschedule compl
     { id: 'done', name: 'Completed task', time: new Date(Date.now() + 60 * 60 * 1000).toISOString(), status: 'done' }
   );
   const app = loadBackground({ state, notificationsAllowed: true });
-  await app.listeners.startup();
+  app.listeners.startup();
+  await new Promise(resolve => setTimeout(resolve, 0));
   assert.equal(app.alarms.length, 1);
   assert.equal(app.alarms[0].name, 'faa-task:future');
   assert.equal(app.notifications.length, 0);

@@ -565,6 +565,7 @@
         const reason = window.prompt('Lý do từ chối (không bắt buộc):', '');
         if (reason === null) return;
         draft.reviewStatus = 'rejected';
+        draft.approvedAt = '';
         draft.rejectionReason = String(reason).slice(0, 500);
         draft.updatedAt = new Date().toISOString();
         log('Đã từ chối bản nháp: ' + draft.id);
@@ -588,7 +589,9 @@
         pageComposerLink = draft.pageLink || '';
         pageComposerSchedule = '';
         activePageDraftId = draft.id;
-        if (!draft.approvedAt) { draft.reviewStatus = 'approved'; draft.approvedAt = new Date().toISOString(); }
+        draft.reviewStatus = 'approved';
+        draft.approvedAt = new Date().toISOString();
+        draft.publishError = '';
         page = 'pages';
         render();
         toast('Đã đưa bản nháp vào trình soạn Page. Hãy kiểm tra và duyệt trước khi đăng.');

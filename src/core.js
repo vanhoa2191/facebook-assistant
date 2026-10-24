@@ -12,7 +12,7 @@
 
   function createDefaultState() {
     return {
-      settings: { language: 'vi', speed: 'normal', provider: 'meta', model: '', groupLimit: 10, delay: 30, pageId: '', graphVersion: 'v26.0' },
+      settings: { language: 'vi', speed: 'normal', provider: 'meta', model: '', groupLimit: 10, delay: 0, pageId: '', graphVersion: 'v26.0' },
       groups: [],
       contacts: [],
       profiles: [],
@@ -25,6 +25,7 @@
       prompts: {
         share: 'Viết lời dẫn ngắn, tự nhiên, phù hợp với {groupName}, dựa trên nội dung: {postText}. Không thêm thông tin chưa được xác minh.',
         general: 'Bạn là trợ lý biên tập. Hãy viết rõ ràng, tự nhiên, đúng ngữ cảnh. Không bịa dữ kiện. Nội dung đầu vào: {content}',
+        connect: 'Soạn lời mời kết nối ngắn gọn, lịch sự, cá nhân hóa dựa trên thông tin đã cung cấp. Không bịa mối quan hệ và không tự gửi lời mời: {content}',
         comment: 'Soạn một bình luận hữu ích, lịch sự cho ngữ cảnh sau: {content}',
         sales: 'Viết bài giới thiệu sản phẩm rõ lợi ích, không phóng đại hoặc thêm dữ kiện chưa cung cấp: {content}',
         feed: 'Tạo một bản tin ngắn dựa hoàn toàn trên thông tin được cung cấp: {content}',
@@ -52,6 +53,10 @@
         ? { ...draft, reviewStatus: 'draft' } : draft);
     }
     if (migrated.settings.provider === 'demo') migrated.settings.provider = 'meta';
+    const groupLimit = Number(migrated.settings.groupLimit);
+    migrated.settings.groupLimit = Number.isFinite(groupLimit) ? Math.min(10, Math.max(1, Math.floor(groupLimit))) : 10;
+    const delay = Number(migrated.settings.delay);
+    migrated.settings.delay = Number.isFinite(delay) ? Math.min(5, Math.max(0, Math.floor(delay))) : 0;
     return migrated;
   }
 
@@ -69,6 +74,16 @@
       const facebookHosts = ['facebook.com', 'www.facebook.com', 'm.facebook.com', 'web.facebook.com'];
       return url.protocol === 'https:' && !url.port && facebookHosts.includes(host) &&
         !url.username && !url.password;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  function isSafeHttpsUrl(value) {
+    if (typeof value !== 'string' || !value.trim() || value.length > 2048) return false;
+    try {
+      const url = new URL(value);
+      return url.protocol === 'https:' && Boolean(url.hostname) && !url.username && !url.password;
     } catch (_) {
       return false;
     }
@@ -97,11 +112,12 @@
     const settings = value.settings;
     if (settings.language !== 'vi' || !['demo', 'gemini', 'meta'].includes(settings.provider) ||
         !isText(settings.model, 120) || !Number.isFinite(settings.groupLimit) ||
-        settings.groupLimit < 1 || settings.groupLimit > 10000 ||
-        !Number.isFinite(settings.delay) || settings.delay < 0 || settings.delay > 86400 ||
+        settings.groupLimit < 1 || settings.groupLimit > 10 ||
+        !Number.isFinite(settings.delay) || settings.delay < 0 || settings.delay > 5 ||
         (settings.pageId !== undefined && settings.pageId !== '' && !/^[0-9]{5,30}$/.test(settings.pageId)) ||
         (settings.graphVersion !== undefined && !/^v[0-9]{1,2}\.0$/.test(settings.graphVersion))) return false;
-    if (!isText(value.prompts.share, 20000)) return false;
+    if (!isText(value.prompts.share, 20000) || !Object.entries(value.prompts).every(([key, prompt]) =>
+      isText(key, 80) && isText(prompt, 20000))) return false;
 
     if (!value.groups.every(group => isObject(group) &&
       isText(group.id, 100) && group.id.length > 0 &&
@@ -130,7 +146,7 @@
       (profile.prompt === undefined || isText(profile.prompt, 20000)))) return false;
     if (!value.tasks.every(task => isObject(task) &&
       isText(task.id, 100) && isText(task.name, 200) &&
-      isText(task.time, 100) &&
+      isText(task.time, 100) && Number.isFinite(Date.parse(task.time)) &&
       (task.status === undefined || ['scheduled', 'due', 'done', 'missed'].includes(task.status)) &&
       (task.draftId === undefined || isText(task.draftId, 100)))) return false;
     if (!value.logs.every(log => isObject(log) &&
@@ -140,14 +156,14 @@
       isText(item.pageId, 30) && /^[0-9]{5,30}$/.test(item.pageId) &&
       isText(item.message, 60000) && item.message.trim().length > 0 &&
       isText(item.link, 2048) &&
-      (!item.link || /^https:\/\//i.test(item.link)) &&
+      (!item.link || isSafeHttpsUrl(item.link)) &&
       isText(item.scheduledAt, 100) && Number.isFinite(Date.parse(item.scheduledAt)) &&
       isText(item.createdAt, 100) && Number.isFinite(Date.parse(item.createdAt)) &&
       (item.status === undefined || item.status === 'scheduled'))) return false;
     if (!value.drafts.every(draft => isObject(draft) &&
       isText(draft.id, 100) && isText(draft.text, 20000) &&
-      isText(draft.url, 2048) &&
-      (draft.sourceUrl === undefined || (isText(draft.sourceUrl, 2048) && (!draft.sourceUrl || /^https:\/\//i.test(draft.sourceUrl)))) &&
+      isText(draft.url, 2048) && (!draft.url || isSafeHttpsUrl(draft.url)) &&
+      (draft.sourceUrl === undefined || (isText(draft.sourceUrl, 2048) && (!draft.sourceUrl || isSafeHttpsUrl(draft.sourceUrl)))) &&
       isText(draft.createdAt, 100) &&
       (draft.kind === undefined || ['source', 'share', 'ai'].includes(draft.kind)) &&
       (draft.targetGroupId === undefined || isText(draft.targetGroupId, 100)) &&
@@ -230,5 +246,5 @@
     }).join(',')).join('\r\n');
   }
 
-  return { createDefaultState, migrateState, escapeHtml, isSafeFacebookUrl, isSafeFacebookGroupUrl, isValidState, fillPrompt, parseCsv, toCsv };
+  return { createDefaultState, migrateState, escapeHtml, isSafeHttpsUrl, isSafeFacebookUrl, isSafeFacebookGroupUrl, isValidState, fillPrompt, parseCsv, toCsv };
 });

@@ -111,7 +111,7 @@
       '<div class="btnrow">' + button(state.settings.provider === 'gemini' ? 'Tạo nháp bằng Gemini' : 'Tạo nháp bằng Meta AI Web', 'generateModuleDraft', 'primary') + button('Sao chép prompt', 'copyModulePrompt') + '</div>' +
       '<div class="field"><label for="moduleOutput">Kết quả từ Meta AI hoặc AI bên ngoài</label><textarea id="moduleOutput" maxlength="20000" placeholder="Dán kết quả AI đã tạo ở bên ngoài..."></textarea></div>' +
       '<div class="btnrow">' + button('Lưu kết quả AI thành nháp', 'saveModuleOutputDraft') + button('Lưu nội dung nguồn', 'saveModuleDraft') + '</div>' +
-      '<div class="banner">' + esc(safetyNote) + ' Bạn có thể sao chép prompt sang Meta AI hoặc công cụ khác rồi dán kết quả tại đây.</div><h3>Nháp gần đây</h3>' + draftList(4) +
+      '<div class="banner">' + esc(safetyNote) + ' Bạn có thể tạo trực tiếp bằng Meta AI Web sau khi cấp quyền, hoặc dùng sao chép/dán thủ công khi giao diện Meta AI thay đổi.</div><h3>Nháp gần đây</h3>' + draftList(4) +
       '</section><section class="panel blue"><h2>Ghi chú nghiệp vụ</h2><div class="field"><label for="moduleNote">Ghi chú nội bộ</label><textarea id="moduleNote" maxlength="2000" placeholder="Ghi yêu cầu cho module này...">' + esc(note) + '</textarea></div>' +
       button('Lưu ghi chú', 'saveNote', 'primary') + '</section></div>';
   }
@@ -821,7 +821,7 @@
         const selected = state.groups.filter(group => group.selected && Core.isSafeFacebookGroupUrl(group.url));
         const targets = selected.length ? selected.slice(0, 5) : [{ id: '', name: 'Chưa chọn nhóm', url: '' }];
         if (selected.length > 5 && !window.confirm('Đã chọn ' + selected.length + ' nhóm. Tạo nháp cho 5 nhóm đầu tiên trong lượt này?')) return;
-        if (!window.confirm('Gửi nội dung đầu vào tới Gemini để tạo ' + targets.length + ' bản nháp? Không có nội dung nào được đăng tự động.')) return;
+        if (!window.confirm('Gửi nội dung đầu vào tới ' + (state.settings.provider === 'gemini' ? 'Gemini' : 'Meta AI Web') + ' để tạo ' + targets.length + ' bản nháp? Không có nội dung nào được đăng tự động.')) return;
         let created = 0;
         for (const group of targets) {
           let prompt = Core.fillPrompt(state.prompts.share, { postText, groupName: group.name });

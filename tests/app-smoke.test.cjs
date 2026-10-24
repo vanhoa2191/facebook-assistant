@@ -76,7 +76,7 @@ function loadApp(options) {
   return { elements, listeners };
 }
 
-test('dashboard initializes and renders all 12 navigation modules', async () => {
+test('dashboard initializes and renders all 13 navigation modules', async () => {
   const { elements } = loadApp();
   await new Promise(resolve => setTimeout(resolve, 10));
   const sidebar = elements['#sidebar'].innerHTML;

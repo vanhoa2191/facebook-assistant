@@ -33,6 +33,7 @@
   let state = Core.createDefaultState();
   let page = 'groups';
   let toastTimer = null;
+  let toastSequence = 0;
   let aiKeyPresent = false;
   let aiPermissionPresent = false;
   let aiOutput = '';
@@ -472,6 +473,7 @@
     return ({ draft: 'Chờ duyệt', approved: 'Đã duyệt · chờ đăng', rejected: 'Đã từ chối', scheduled: 'Đã lên lịch', published: 'Đã đăng', failed: 'Đăng thất bại' })[status || 'draft'] || 'Chờ duyệt';
   }
   function toast(message) {
+    toastSequence += 1;
     const element = $('#toast');
     element.textContent = message;
     element.style.display = 'block';
@@ -487,6 +489,7 @@
     setTimeout(() => URL.revokeObjectURL(url), 1000);
   }
   async function action(name, id) {
+    const toastSequenceAtStart = toastSequence;
     switch (name) {
       case 'saveSettings': {
         const groupLimit = Number($('#groupLimit') ? $('#groupLimit').value : state.settings.groupLimit);
@@ -1345,7 +1348,7 @@
     }
     await save();
     render();
-    toast('Đã lưu trên trình duyệt');
+    if (toastSequence === toastSequenceAtStart) toast('Đã lưu trên trình duyệt');
   }
   function init() {
     chrome.storage.local.get('faa.state').then(async result => {

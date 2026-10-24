@@ -46,6 +46,10 @@
       migrated.tasks = value.tasks.map(task => isObject(task) && !task.status
         ? { ...task, status: 'scheduled' } : task);
     }
+    if (Array.isArray(value.drafts)) {
+      migrated.drafts = value.drafts.map(draft => isObject(draft) && !draft.reviewStatus
+        ? { ...draft, reviewStatus: 'draft' } : draft);
+    }
     if (migrated.settings.provider === 'demo') migrated.settings.provider = 'meta';
     return migrated;
   }
@@ -139,7 +143,14 @@
       (draft.targetGroupId === undefined || isText(draft.targetGroupId, 100)) &&
       (draft.targetGroupName === undefined || isText(draft.targetGroupName, 200)) &&
       (draft.targetGroupUrl === undefined || isSafeFacebookGroupUrl(draft.targetGroupUrl)) &&
-      (draft.updatedAt === undefined || isText(draft.updatedAt, 100)))) return false;
+      (draft.updatedAt === undefined || isText(draft.updatedAt, 100)) &&
+      (draft.reviewStatus === undefined || ['draft', 'approved', 'rejected', 'scheduled', 'published', 'failed'].includes(draft.reviewStatus)) &&
+      (draft.approvedAt === undefined || isText(draft.approvedAt, 100)) &&
+      (draft.publishedAt === undefined || isText(draft.publishedAt, 100)) &&
+      (draft.scheduledAt === undefined || isText(draft.scheduledAt, 100)) &&
+      (draft.postId === undefined || isText(draft.postId, 100)) &&
+      (draft.pageId === undefined || (isText(draft.pageId, 30) && /^[0-9]{5,30}$/.test(draft.pageId))) &&
+      (draft.publishError === undefined || isText(draft.publishError, 1000)))) return false;
     if (value.moduleNotes && !Object.entries(value.moduleNotes).every(entry =>
       isText(entry[0], 80) && isText(entry[1], 2000))) return false;
     return true;

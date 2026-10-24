@@ -2,11 +2,13 @@
 
 Chrome Extension Manifest V3 with a Vietnamese dashboard for managing Facebook content workflows and AI-assisted drafts.
 
-## Phase 1–8 scope
+## Phase 1–9 scope
 
-- Thirteen navigation modules aligned with the reference screenshots, including a dedicated review queue.
+- Fourteen navigation modules aligned with the reference screenshots, including a dedicated review queue and analytics dashboard.
 - Local group list management, selection, CSV import/export, and safe URL validation.
-- Manual contact tracking for Facebook profiles: save profile links, open them, and track invitation/connection/follow-up status without sending requests automatically.
+- Manual contact tracking for Facebook profiles: save profile links, open them, track invitation/connection/follow-up status, and import comparison CSV files by profile URL/ID first and name second without sending requests automatically.
+- On-demand capture of the visible content of a Facebook post permalink and currently rendered comments/replies, linked to a contact profile if selected. No feed-wide scraping, automatic scrolling, cookie/token access, or access-control bypass.
+- Local observation history, contextual AI analysis, weekly local reports, on-demand AI report summaries, desktop notifications, and CSV exports that open in Excel.
 - Gemini API adapter with optional host permission, timeout, and session-only API key storage.
 - Meta AI Web UI integration (no Meta model API): request optional Chrome `scripting` and `meta.ai` host permissions, open the official website, fill the visible chat composer, send a prompt, wait for the response, and save the result as a local draft.
 - Manual copy/paste fallback remains available if Meta AI changes its interface or requires user action.
@@ -57,6 +59,16 @@ Scheduled posts must be at least 10 minutes and no more than 30 days ahead in th
 
 The extension calls the versioned Page feed endpoint. Meta may require app setup, business verification, permission review, or other eligibility checks. CI tests use mocked API responses; live publishing and scheduling have not been tested without your own Meta app, Page ID, and token.
 
+## Visible Facebook post capture and profile analysis
+
+1. Open a specific Facebook post permalink in another tab and sign in normally.
+2. Open **Bản tin & AI** and select a contact profile if you want to associate the observation with that profile.
+3. Click **Thu thập bài đang mở** and grant the optional Facebook/scripting permission when Chrome asks. The extension reads only the main content currently rendered on that post page, including comment/reply blocks that are already loaded.
+4. Use **Phân tích bằng AI** to send the saved text to the selected provider. Meta AI uses its visible website UI (no Meta AI API); the user action is required for each analysis.
+5. Open **Phân tích & báo cáo** to create a local 7-day summary, request an AI summary, and export observations/reports as CSV for Excel.
+
+The capture is user-triggered and limited to a specific post permalink. It does not auto-scroll to load more comments or scrape the entire feed. Profile analysis is restricted to themes, context-expressed sentiment/opinions, repeated topics and measurable engagement; it must not infer sensitive traits.
+
 ## Reminders and notifications
 
 1. Open **Lịch chạy** and click **Cấp quyền thông báo** if you want desktop alerts.
@@ -65,7 +77,7 @@ The extension calls the versioned Page feed endpoint. Meta may require app setup
 
 ## Current limitations
 
-The extension does not log into Facebook, scrape Facebook pages/groups, send friend requests, join groups, or auto-publish posts/comments to groups or personal profiles. The scrape and learning modules work with text you paste in and can retain a source URL; they do not collect or scrape Facebook content automatically. Meta AI Web UI automation requires the user to grant optional `scripting` and `meta.ai` host permissions. It is not a model API integration and may need selector updates if the website changes. Gemini and Facebook Graph API access remain optional. No permanent Facebook host permission or cookies access is requested.
+The extension does not log into Facebook, crawl entire profiles or feeds, send friend requests, join groups, or auto-publish posts/comments to groups or personal profiles. The user-triggered capture module reads visible text only from a specific post permalink and does not auto-scroll or bypass access controls. The scrape and learning modules also work with text you paste in. Meta AI Web UI automation requires the user to grant optional `scripting` and `meta.ai` host permissions. It is not a model API integration and may need selector updates if the website changes. Gemini and Facebook Graph API access remain optional. No permanent Facebook host permission or cookies access is requested.
 
 ## Development
 

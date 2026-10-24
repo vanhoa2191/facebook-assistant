@@ -2,7 +2,7 @@
 
 Chrome Extension Manifest V3 with a Vietnamese dashboard for managing Facebook content workflows and AI-assisted drafts.
 
-## Phase 1–7 scope
+## Phase 1–8 scope
 
 - Thirteen navigation modules aligned with the reference screenshots, including a dedicated review queue.
 - Local group list management, selection, CSV import/export, and safe URL validation.
@@ -14,7 +14,7 @@ Chrome Extension Manifest V3 with a Vietnamese dashboard for managing Facebook c
 - Optional Facebook Pages Graph API publishing and native Meta scheduling, using a Page access token, explicit host permission, and confirmation before public actions.
 - A dedicated review queue tracks draft, approved, rejected, failed, scheduled, and published states.
 - Editing a previously approved draft returns it to the review queue; publishing results and post IDs are linked back to the draft.
-- Share-post drafts, Chrome Alarms reminders, activity log, and JSON/CSV export.
+- Share-post drafts, Chrome Alarms reminders with optional desktop notifications, activity log, and JSON/CSV export.
 - Strict local import validation, source-link preservation, and escaping of user-provided values.
 - GitHub Actions CI for unit tests, extension validation, and ZIP packaging.
 
@@ -56,6 +56,12 @@ The key is stored in chrome.storage.session, not in exported JSON or the activit
 Scheduled posts must be at least 10 minutes and no more than 30 days ahead in this version. The extension sends the scheduled post to Meta using `published=false` and `scheduled_publish_time`. After Meta confirms, the returned post ID and schedule are saved locally, linked to the draft, and shown in Lịch chạy and Duyệt bài. Use Mở Planner to review the schedule in Meta Business Suite. The extension does not poll Meta for later publication status.
 
 The extension calls the versioned Page feed endpoint. Meta may require app setup, business verification, permission review, or other eligibility checks. CI tests use mocked API responses; live publishing and scheduling have not been tested without your own Meta app, Page ID, and token.
+
+## Reminders and notifications
+
+1. Open **Lịch chạy** and click **Cấp quyền thông báo** if you want desktop alerts.
+2. Add a reminder with a future date and time; optionally link a draft.
+3. When it becomes due, the extension updates its badge and shows a desktop notification if permission is enabled. Clicking the notification opens the dashboard. Notifications do not publish, message, or otherwise act on Facebook.
 
 ## Current limitations
 

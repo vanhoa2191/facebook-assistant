@@ -234,6 +234,7 @@ test('confirmed Page publishing records the result in the review queue', async (
   assert.match(elements['#view'].innerHTML, /12345678_98765432/);
 
   clickNav('review');
+  clickAction('clearReviewFilter');
   assert.match(elements['#view'].innerHTML, /Đã đăng/);
   assert.match(elements['#view'].innerHTML, /12345678_98765432/);
 });

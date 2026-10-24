@@ -402,3 +402,51 @@ test('analytics module exposes local weekly report and Excel-compatible CSV expo
   assert.match(elements['#view'].innerHTML, /Xuất báo cáo CSV \(Excel\)/);
   assert.match(elements['#view'].innerHTML, /Báo cáo 7 ngày/);
 });
+
+
+test('CSV import never merges two distinct Facebook IDs merely because names match', async () => {
+  const initialState = Core.createDefaultState();
+  initialState.contacts.push({
+    id: 'existing-111', name: 'Nguyen Van A',
+    url: 'https://www.facebook.com/profile.php?id=111',
+    facebookId: '111', status: 'connected',
+    note: 'Keep existing identity', createdAt: '2026-10-20T00:00:00.000Z'
+  });
+  const { elements, listeners } = loadApp({ initialState });
+  await new Promise(resolve => setTimeout(resolve, 10));
+  const csv = 'name,url,facebook id\nNguyen Van A,https://www.facebook.com/profile.php?id=222,222';
+  const file = { size: csv.length, text: async () => csv };
+  await listeners['document:change']({ target: { id: 'contactImportFile', files: [file], value: 'contacts.csv' } });
+  await new Promise(resolve => setTimeout(resolve, 10));
+  listeners['document:click']({ target: { closest(selector) {
+    return selector === '[data-nav]' ? { dataset: { nav: 'connect' } } : null;
+  } } });
+  const html = elements['#view'].innerHTML;
+  assert.match(html, /existing-111/);
+  assert.match(html, /profile\.php\?id=111/);
+  assert.match(html, /profile\.php\?id=222/);
+  assert.match(html, /Đã kết nối/);
+  assert.match(elements['#toast'].textContent, /thêm 1, cập nhật 0, bỏ qua 0/);
+});
+
+test('rebuilding a weekly report in the dashboard preserves its saved AI summary', async () => {
+  const initialState = Core.createDefaultState();
+  const now = Date.now();
+  const report = Core.buildWeeklyReport(initialState, now);
+  report.aiSummary = 'Tóm tắt AI đã được lưu trước đó.';
+  report.aiSummaryAt = new Date(now - 1000).toISOString();
+  initialState.weeklyReports.push(report);
+  const { elements, listeners } = loadApp({ initialState });
+  await new Promise(resolve => setTimeout(resolve, 10));
+  const clickNav = nav => listeners['document:click']({ target: { closest(selector) {
+    return selector === '[data-nav]' ? { dataset: { nav: 'analytics' } } : null;
+  } } });
+  const clickAction = action => listeners['document:click']({ target: { closest(selector) {
+    return selector === '[data-action]' ? { dataset: { action } } : null;
+  } } });
+  clickNav('analytics');
+  clickAction('createWeeklyReportNow');
+  await new Promise(resolve => setTimeout(resolve, 15));
+  assert.match(elements['#view'].innerHTML, /Tóm tắt AI đã được lưu trước đó/);
+  assert.match(elements['#toast'].textContent, /Đã tạo báo cáo thống kê cục bộ/);
+});

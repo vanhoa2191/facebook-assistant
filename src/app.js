@@ -454,7 +454,7 @@
       notificationPermissionPresent = false;
     }
   }
-  function waitForMetaTabReady(tabId, timeoutMs) {
+  function waitForTabReady(tabId, timeoutMs, label) {
     return new Promise((resolve, reject) => {
       let settled = false;
       const finish = (error, tab) => {
@@ -467,7 +467,8 @@
       const onUpdated = (updatedId, changeInfo, tab) => {
         if (updatedId === tabId && changeInfo.status === 'complete') finish(null, tab);
       };
-      const timer = setTimeout(() => finish(new Error('Meta AI Web chưa tải xong. Hãy kiểm tra tab và thử lại.')), timeoutMs || 45000);
+      const siteLabel = label || 'Trang';
+      const timer = setTimeout(() => finish(new Error(siteLabel + ' chưa tải xong. Hãy kiểm tra tab và thử lại.')), timeoutMs || 45000);
       chrome.tabs.onUpdated.addListener(onUpdated);
       chrome.tabs.get(tabId).then(tab => {
         if (tab.status === 'complete') finish(null, tab);
@@ -482,9 +483,9 @@
     let tab = tabs.find(item => item.id != null && /^https:\/\/(www\.)?meta\.ai\//i.test(item.url || ''));
     if (!tab) {
       tab = await chrome.tabs.create({ url: 'https://www.meta.ai/' });
-      tab = await waitForMetaTabReady(tab.id, 45000);
+      tab = await waitForTabReady(tab.id, 45000, 'Meta AI Web');
     } else if (tab.status !== 'complete') {
-      tab = await waitForMetaTabReady(tab.id, 45000);
+      tab = await waitForTabReady(tab.id, 45000, 'Meta AI Web');
     }
     if (!tab || !tab.id || !/^https:\/\/(www\.)?meta\.ai\//i.test(tab.url || '')) {
       throw new Error('Tab chưa ở trên meta.ai. Hãy mở trang Meta AI chính thức rồi thử lại.');

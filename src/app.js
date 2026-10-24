@@ -71,7 +71,7 @@
       (draft.targetGroupName ? '<div class="draft-target">Nhóm đích: ' + esc(draft.targetGroupName) + '</div>' : '') +
       '<p class="draft-text">' + esc(draft.text.slice(0, 700)) + (draft.text.length > 700 ? '…' : '') + '</p>' +
       '<div class="btnrow">' + button('Sao chép', 'copyDraft', '', draft.id) + button('Sửa', 'editDraft', '', draft.id) +
-      (draft.url && Core.isSafeFacebookUrl(draft.url) ? button('Mở bài gốc', 'openDraftSource', '', draft.id) : '') +
+      (draft.url && Core.isSafeFacebookUrl(draft.url) ? button('Mở liên kết', 'openDraftSource', '', draft.id) : '') +
       (draft.targetGroupUrl ? button('Mở nhóm', 'openDraftGroup', '', draft.id) : '') +
       button('Duyệt bài', 'reviewDraft', '', draft.id) + button('Dùng cho Page', 'useDraftForPage', '', draft.id) +
       button('Xóa', 'deleteDraft', 'warn', draft.id) + '</div></article>'
@@ -279,7 +279,7 @@
           (draft.targetGroupName ? '<div class="draft-target">Nhóm đích: ' + esc(draft.targetGroupName) + '</div>' : '') +
           '<p class="draft-text">' + esc(draft.text.slice(0, 700)) + (draft.text.length > 700 ? '…' : '') + '</p>' +
           '<div class="btnrow">' + button('Sao chép', 'copyDraft', '', draft.id) + button('Sửa', 'editDraft', '', draft.id) +
-          (draft.url && Core.isSafeFacebookUrl(draft.url) ? button('Mở bài gốc', 'openDraftSource', '', draft.id) : '') +
+          (draft.url && Core.isSafeFacebookUrl(draft.url) ? button('Mở liên kết', 'openDraftSource', '', draft.id) : '') +
       (draft.targetGroupUrl ? button('Mở nhóm', 'openDraftGroup', '', draft.id) : '') +
           button('Xóa', 'deleteDraft', 'warn', draft.id) + '</div></article>'
         ).join('') + '</div>'

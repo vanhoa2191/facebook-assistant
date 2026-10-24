@@ -46,6 +46,7 @@
       migrated.tasks = value.tasks.map(task => isObject(task) && !task.status
         ? { ...task, status: 'scheduled' } : task);
     }
+    if (migrated.settings.provider === 'demo') migrated.settings.provider = 'meta';
     return migrated;
   }
 

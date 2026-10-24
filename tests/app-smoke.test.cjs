@@ -44,10 +44,15 @@ function loadApp() {
       }
     },
     permissions: {
-      contains: async () => false,
+      contains: async args => Array.isArray(args.permissions) && args.permissions.includes('scripting') && (args.origins || []).some(origin => origin.includes('meta.ai')),
       request: async () => false
     },
-    tabs: { create: async () => ({ id: 1 }) }
+    tabs: {
+      create: async () => ({ id: 1 }),
+      query: async () => [{ id: 7, url: 'https://www.meta.ai/', status: 'complete' }],
+      sendMessage: async () => ({ ok: true, text: 'Bản nháp Meta AI đã được tạo thành công.' })
+    },
+    scripting: { executeScript: async () => [{}] }
   };
   const context = { window, document, chrome, crypto, navigator: { clipboard: { writeText: async () => {} } } };
   const appPath = path.join(__dirname, '..', 'src', 'app.js');
@@ -64,6 +69,24 @@ test('dashboard initializes and renders all 12 navigation modules', async () => 
   assert.match(elements['#view'].innerHTML, /Thêm nhóm/);
   assert.match(elements['#view'].innerHTML, /Theo dõi tương tác/);
   assert.match(elements['#view'].innerHTML, /addEngagement/);
+});
+
+test('header distinguishes Meta AI Web status from Facebook Page API setup', async () => {
+  const { elements, listeners } = loadApp();
+  await new Promise(resolve => setTimeout(resolve, 10));
+  assert.match(elements['#connectionStatus'].textContent, /Meta AI Web đã cấp quyền/);
+  assert.match(elements['#connectionStatus'].textContent, /Facebook Page API chưa cấu hình/);
+  assert.doesNotMatch(elements['#connectionStatus'].textContent, /chưa kết nối Facebook/);
+
+  elements['#metaWebPrompt'].value = 'Hãy biên tập nội dung sau: {content}';
+  elements['#metaWebInput'].value = 'Viết lời giới thiệu ngắn.';
+  listeners['document:click']({ target: { closest(selector) {
+    return selector === '[data-action]' ? { dataset: { action: 'generateMetaWebDraft' } } : null;
+  } } });
+  await new Promise(resolve => setTimeout(resolve, 30));
+  assert.match(elements['#connectionStatus'].textContent, /Meta AI Web hoạt động/);
+  assert.match(elements['#connectionStatus'].textContent, /Facebook Page API chưa cấu hình/);
+  assert.match(elements['#view'].innerHTML, /Đã nhận câu trả lời và lưu thành bản nháp/);
 });
 
 test('navigation opens the AI and sales modules without runtime errors', async () => {

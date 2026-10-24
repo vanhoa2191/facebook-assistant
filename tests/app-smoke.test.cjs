@@ -81,8 +81,8 @@ test('header distinguishes Meta AI Web status from Facebook Page API setup', asy
   listeners['document:click']({ target: { closest(selector) {
     return selector === '[data-nav]' ? { dataset: { nav: 'ai' } } : null;
   } } });
-  elements['#metaWebPrompt'].value = 'Hãy biên tập nội dung sau: {content}';
-  elements['#metaWebInput'].value = 'Viết lời giới thiệu ngắn.';
+  elements['#metaWebPrompt'] = { value: 'Hãy biên tập nội dung sau: {content}' };
+  elements['#metaWebInput'] = { value: 'Viết lời giới thiệu ngắn.' };
   listeners['document:click']({ target: { closest(selector) {
     return selector === '[data-action]' ? { dataset: { action: 'generateMetaWebDraft' } } : null;
   } } });

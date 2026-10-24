@@ -142,7 +142,7 @@
   }
 
   function renderAI() {
-    const options = [['meta', 'Meta AI Web (giao diện trình duyệt, không API)'], ['gemini', 'Gemini API'], ['demo', 'Demo']];
+    const options = [['meta', 'Meta AI Web (giao diện trình duyệt, không API)'], ['gemini', 'Gemini API (tùy chọn)']];
     const prompt = state.prompts.general || 'Hãy biên tập nội dung sau, không thêm dữ kiện: {content}';
     return '<div class="grid"><section class="panel blue"><h2>Hồ sơ AI dùng chung</h2><p>Chọn AI mặc định cho các module soạn nội dung</p><div class="field"><label for="provider">AI Provider</label><select id="provider">' + options.map(o => '<option value="' + o[0] + '" ' + (state.settings.provider === o[0] ? 'selected' : '') + '>' + o[1] + '</option>').join('') + '</select></div>' +
       field('Model Gemini (chỉ dùng khi chọn Gemini)', 'model', state.settings.model || 'gemini-2.5-flash') +
@@ -300,6 +300,7 @@
       pageTokenPresent = false;
       aiPermissionPresent = false;
       graphPermissionPresent = false;
+      metaWebPermissionPresent = false;
     }
   }
   function waitForMetaTabReady(tabId, timeoutMs) {
@@ -663,7 +664,7 @@
       case 'useProfile': {
         const profile = state.profiles.find(item => item.id === id);
         if (!profile) { toast('Không tìm thấy hồ sơ AI'); return; }
-        state.settings.provider = ['demo', 'gemini', 'meta'].includes(profile.provider) ? profile.provider : 'demo';
+        state.settings.provider = profile.provider === 'gemini' ? 'gemini' : 'meta';
         state.settings.model = profile.model || state.settings.model;
         if (profile.prompt) state.prompts.general = profile.prompt;
         log('Đã áp dụng hồ sơ AI: ' + profile.name);
@@ -803,7 +804,7 @@
           log(state.settings.provider === 'gemini' ? 'Đã tạo nháp bằng Gemini' : 'Đã tạo nháp bằng Meta AI Web');
           break;
         } catch (error) {
-          log('Gemini lỗi khi tạo nháp: ' + error.message);
+          log((state.settings.provider === 'gemini' ? 'Gemini' : 'Meta AI Web') + ' lỗi khi tạo nháp: ' + error.message);
           await save();
           toast(error.message);
           return;
@@ -836,7 +837,7 @@
             log('Đã tạo nháp lời dẫn' + (group.url ? ' cho nhóm ' + group.name : ''));
             await save();
           } catch (error) {
-            log('Gemini lỗi khi tạo lời dẫn: ' + error.message);
+            log((state.settings.provider === 'gemini' ? 'Gemini' : 'Meta AI Web') + ' lỗi khi tạo lời dẫn: ' + error.message);
             await save();
             toast('Đã tạo ' + created + ' nháp trước khi gặp lỗi: ' + error.message);
             render();
@@ -1011,7 +1012,7 @@
           log(state.settings.provider === 'gemini' ? 'Đã tạo bản nháp bằng Gemini: ' + TITLES[page] : 'Đã tạo bản nháp bằng Meta AI Web: ' + TITLES[page]);
           break;
         } catch (error) {
-          log('Gemini lỗi tại module ' + TITLES[page] + ': ' + error.message);
+          log((state.settings.provider === 'gemini' ? 'Gemini' : 'Meta AI Web') + ' lỗi tại module ' + TITLES[page] + ': ' + error.message);
           await save();
           toast(error.message);
           return;

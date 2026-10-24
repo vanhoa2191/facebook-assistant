@@ -215,6 +215,7 @@ test('Meta AI draft moves through review queue and saves edits without publishin
   const savedDraft = elements['#view'].innerHTML.match(/data-action="reviewDraft" data-id="([^"]+)"/);
   assert.ok(savedDraft);
   clickAction('reviewDraft', savedDraft[1]);
+  await new Promise(resolve => setTimeout(resolve, 10));
   assert.match(elements['#view'].innerHTML, /id="pageLink" type="text" value="https:\/\/example.com\/landing"/);
 });
 

@@ -57,7 +57,7 @@ The extension calls the versioned Page feed endpoint. Meta may require app setup
 
 ## Current limitations
 
-The extension does not log into Facebook, scrape Facebook pages/groups, send friend requests, join groups, or auto-publish posts/comments to groups or personal profiles. The scrape and learning modules work with text you paste in; they do not collect data from Facebook. Gemini access and Graph API host access are optional. Meta AI is supported as a manual copy/paste workflow rather than an automated Meta AI API integration. No permanent Facebook host permission or cookies access is requested.
+The extension does not log into Facebook, scrape Facebook pages/groups, send friend requests, join groups, or auto-publish posts/comments to groups or personal profiles. The scrape and learning modules work with text you paste in; they do not collect data from Facebook. Meta AI Web UI automation requires the user to grant optional `scripting` and `meta.ai` host permissions. It is not a model API integration and may need selector updates if the website changes. Gemini and Facebook Graph API access remain optional. No permanent Facebook host permission or cookies access is requested.
 
 ## Development
 

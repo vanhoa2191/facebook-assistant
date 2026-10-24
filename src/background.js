@@ -68,5 +68,5 @@ chrome.action.onClicked.addListener(() => {
   chrome.tabs.create({ url: chrome.runtime.getURL('dashboard.html') });
 });
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-  if (message && message.type === 'PING') sendResponse({ ok: true, version: '0.6.1' });
+  if (message && message.type === 'PING') sendResponse({ ok: true, version: '0.7.0' });
 });

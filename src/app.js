@@ -550,7 +550,7 @@
         draft.publishError = '';
         activePageDraftId = draft.id;
         pageComposerDraft = draft.text;
-        pageComposerLink = draft.url || '';
+        pageComposerLink = draft.pageLink || '';
         pageComposerSchedule = '';
         pagePublishStatus = 'Bản nháp đã được duyệt sơ bộ. Hãy kiểm tra lần cuối trước khi đăng.';
         page = 'pages';
@@ -584,7 +584,7 @@
         if (!draft) { toast('Không tìm thấy bản nháp.'); return; }
         if (['published', 'scheduled'].includes(draft.reviewStatus)) { toast('Bản nháp này đã đăng hoặc đã lên lịch.'); return; }
         pageComposerDraft = draft.text;
-        pageComposerLink = draft.url || '';
+        pageComposerLink = draft.pageLink || '';
         pageComposerSchedule = '';
         activePageDraftId = draft.id;
         if (!draft.approvedAt) { draft.reviewStatus = 'approved'; draft.approvedAt = new Date().toISOString(); }
@@ -635,14 +635,14 @@
         let draft = activePageDraftId ? state.drafts.find(item => item.id === activePageDraftId) : null;
         if (draft) {
           draft.text = message;
-          if (draft.url && !draft.sourceUrl) draft.sourceUrl = draft.url;
-          draft.url = link;
+          draft.pageLink = link;
           draft.updatedAt = new Date().toISOString();
           draft.reviewStatus = 'draft';
           draft.approvedAt = '';
           draft.publishError = '';
         } else {
-          draft = addDraft(message, link, 'ai');
+          draft = addDraft(message, '', 'ai');
+          draft.pageLink = link;
           activePageDraftId = draft.id;
         }
         pageComposerDraft = message;
@@ -689,7 +689,8 @@
           : 'Bạn đang đăng công khai lên Facebook Page ' + pageId + '. Sau khi xác nhận, bài viết sẽ được gửi tới Meta. Tiếp tục?';
         if (!window.confirm(confirmText)) return;
         if (!activePageDraftId) {
-          const draft = addDraft(message, link, 'source');
+          const draft = addDraft(message, '', 'source');
+          draft.pageLink = link;
           activePageDraftId = draft.id;
           draft.reviewStatus = 'approved';
           draft.approvedAt = new Date().toISOString();
@@ -709,14 +710,14 @@
             if (state.pageSchedules.length > 500) state.pageSchedules.shift();
             if (activePageDraftId) {
               const draft = state.drafts.find(item => item.id === activePageDraftId);
-              if (draft) { draft.text = message; if (draft.url && !draft.sourceUrl) draft.sourceUrl = draft.url; draft.url = link; draft.reviewStatus = 'scheduled'; draft.scheduledAt = result.scheduledAt || scheduledPublishAt; draft.pageId = pageId; draft.postId = result.id; draft.publishError = ''; draft.updatedAt = new Date().toISOString(); }
+              if (draft) { draft.text = message; draft.pageLink = link; draft.reviewStatus = 'scheduled'; draft.scheduledAt = result.scheduledAt || scheduledPublishAt; draft.pageId = pageId; draft.postId = result.id; draft.publishError = ''; draft.updatedAt = new Date().toISOString(); }
             }
             pagePublishStatus = 'Đã gửi lịch đăng tới Meta. Post ID: ' + result.id;
             log('Đã lên lịch đăng Page ' + pageId + ' vào ' + (result.scheduledAt || scheduledPublishAt) + '; Post ID: ' + result.id);
           } else {
             if (activePageDraftId) {
               const draft = state.drafts.find(item => item.id === activePageDraftId);
-              if (draft) { draft.text = message; if (draft.url && !draft.sourceUrl) draft.sourceUrl = draft.url; draft.url = link; draft.reviewStatus = 'published'; draft.publishedAt = new Date().toISOString(); draft.pageId = pageId; draft.postId = result.id; draft.publishError = ''; draft.updatedAt = new Date().toISOString(); }
+              if (draft) { draft.text = message; draft.pageLink = link; draft.reviewStatus = 'published'; draft.publishedAt = new Date().toISOString(); draft.pageId = pageId; draft.postId = result.id; draft.publishError = ''; draft.updatedAt = new Date().toISOString(); }
             }
             pagePublishStatus = 'Đăng thành công. Post ID: ' + result.id;
             log('Đã đăng bài lên Page ' + pageId + '; Post ID: ' + result.id);
@@ -1153,7 +1154,8 @@
           validSource = Core.isSafeHttpsUrl(sourceUrl);
           if (!validSource) { toast('Link nguồn phải là HTTPS hợp lệ.'); return; }
         }
-        addDraft(output, sourceUrl, 'ai');
+        const externalDraft = addDraft(output, '', 'ai');
+        if (sourceUrl) externalDraft.sourceUrl = sourceUrl;
         log('Đã lưu kết quả AI bên ngoài: ' + TITLES[page]);
         break;
       }
@@ -1303,7 +1305,8 @@
             ? await geminiRequest(prompt)
             : await generateWithMetaAiWeb(prompt);
           if (!output) return;
-          addDraft(output, sourceUrl, 'ai');
+          const moduleDraft = addDraft(output, '', 'ai');
+          if (sourceUrl) moduleDraft.sourceUrl = sourceUrl;
           if (state.settings.provider !== 'gemini') metaWebLastSuccess = true;
           log(state.settings.provider === 'gemini' ? 'Đã tạo bản nháp bằng Gemini: ' + TITLES[page] : 'Đã tạo bản nháp bằng Meta AI Web: ' + TITLES[page]);
           break;
@@ -1325,7 +1328,8 @@
         }
         const promptKey = modulePromptKey();
         state.prompts[promptKey] = $('#modulePrompt').value.slice(0, 20000);
-        addDraft(input, sourceUrl, 'source');
+        const sourceDraft = addDraft(input, '', 'source');
+        if (sourceUrl) sourceDraft.sourceUrl = sourceUrl;
         log('Đã lưu nội dung nguồn từ module: ' + TITLES[page]);
         break;
       }

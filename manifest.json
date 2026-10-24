@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "Facebook AI Assistant",
-  "version": "0.7.0",
-  "description": "Trợ lý AI Facebook: Meta AI Web, hàng đợi duyệt nội dung và đăng Page có xác nhận.",
+  "version": "0.7.1",
+  "description": "Trợ lý AI Facebook: Meta AI Web, quản lý liên hệ, hàng đợi duyệt và đăng Page có xác nhận.",
   "permissions": [
     "storage",
     "alarms"

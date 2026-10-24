@@ -132,11 +132,13 @@
       isText(group.id, 100) && group.id.length > 0 &&
       isText(group.name, 200) && group.name.trim().length > 0 &&
       isSafeFacebookGroupUrl(group.url) && typeof group.selected === 'boolean')) return false;
-    if (value.observations.length > 1000 || value.weeklyReports.length > 104) return false;
+    if (value.contacts.length > 1000 || value.observations.length > 1000 || value.weeklyReports.length > 104) return false;
     if (!value.contacts.every(contact => isObject(contact) &&
       isText(contact.id, 100) && contact.id.length > 0 &&
       isText(contact.name, 200) && contact.name.trim().length > 0 &&
-      isSafeFacebookUrl(contact.url) && isText(contact.note, 1000) &&
+      isSafeFacebookUrl(contact.url) &&
+      (contact.facebookId === undefined || (isText(contact.facebookId, 100) && /^[0-9]{1,30}$/.test(contact.facebookId))) &&
+      isText(contact.note, 1000) &&
       ['new', 'opened', 'request_sent', 'connected', 'follow_up', 'declined'].includes(contact.status) &&
       isText(contact.createdAt, 100) &&
       (contact.updatedAt === undefined || isText(contact.updatedAt, 100)))) return false;

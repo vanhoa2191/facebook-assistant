@@ -186,7 +186,11 @@
         let contact = state.contacts.find(item => urlKey && normalizeProfileUrl(item.url) === urlKey);
         if (!contact && facebookId) contact = state.contacts.find(item =>
           item.facebookId === facebookId || facebookIdFromUrl(item.url) === facebookId);
-        if (!contact && name) contact = state.contacts.find(item => item.name.trim().toLocaleLowerCase() === name.toLocaleLowerCase());
+        // Name is only a fallback when neither side has a stable Facebook identity.
+        // Never overwrite a different profile merely because the display names match.
+        if (!contact && !facebookId && name) contact = state.contacts.find(item =>
+          !item.facebookId && !facebookIdFromUrl(item.url) &&
+          item.name.trim().toLocaleLowerCase() === name.toLocaleLowerCase());
         if (contact) {
           contact.name = name || contact.name;
           contact.url = url;
@@ -621,8 +625,13 @@
   function upsertWeeklyReport(report) {
     state.weeklyReports = Array.isArray(state.weeklyReports) ? state.weeklyReports : [];
     const index = state.weeklyReports.findIndex(item => item.id === report.id);
-    if (index >= 0) state.weeklyReports[index] = report;
-    else state.weeklyReports.push(report);
+    if (index >= 0) {
+      const previous = state.weeklyReports[index];
+      // Rebuilding statistics must not erase an AI summary already saved for this report.
+      if (!report.aiSummary && previous.aiSummary) report.aiSummary = previous.aiSummary;
+      if (!report.aiSummaryAt && previous.aiSummaryAt) report.aiSummaryAt = previous.aiSummaryAt;
+      state.weeklyReports[index] = report;
+    } else state.weeklyReports.push(report);
     if (state.weeklyReports.length > 104) state.weeklyReports.splice(0, state.weeklyReports.length - 104);
     return report;
   }

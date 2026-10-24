@@ -12,6 +12,7 @@ function loadApp(options) {
   const settings = options || {};
   const listeners = {};
   const elements = {};
+  const openedTabs = [];
   function makeElement(selector) {
     return {
       selector, innerHTML: '', textContent: '', value: '', style: {},
@@ -41,7 +42,7 @@ function loadApp(options) {
   const chrome = {
     storage: {
       local: {
-        get: async () => ({}),
+        get: async () => settings.initialState ? { 'faa.state': settings.initialState } : {},
         set: async () => ({})
       },
       session: {
@@ -64,7 +65,7 @@ function loadApp(options) {
       request: async () => false
     },
     tabs: {
-      create: async () => ({ id: 1 }),
+      create: async options => { openedTabs.push(options); return { id: openedTabs.length }; },
       query: async () => [{ id: 7, url: 'https://www.meta.ai/', status: 'complete' }],
       sendMessage: async () => ({ ok: true, text: 'Bản nháp Meta AI đã được tạo thành công.' })
     },
@@ -73,7 +74,7 @@ function loadApp(options) {
   const context = { window, document, chrome, crypto, setTimeout, clearTimeout, Date, URL, Blob, navigator: { clipboard: { writeText: async () => {} } } };
   const appPath = path.join(__dirname, '..', 'src', 'app.js');
   vm.runInNewContext(fs.readFileSync(appPath, 'utf8'), context, { filename: 'src/app.js' });
-  return { elements, listeners };
+  return { elements, listeners, openedTabs };
 }
 
 test('dashboard initializes and renders all 13 navigation modules', async () => {
@@ -237,4 +238,56 @@ test('confirmed Page publishing records the result in the review queue', async (
   clickAction('clearReviewFilter');
   assert.match(elements['#view'].innerHTML, /Đã đăng/);
   assert.match(elements['#view'].innerHTML, /12345678_98765432/);
+});
+
+
+test('connect module can generate a reviewed invitation draft with its source URL', async () => {
+  const { elements, listeners } = loadApp();
+  await new Promise(resolve => setTimeout(resolve, 10));
+  const clickNav = nav => listeners['document:click']({ target: { closest(selector) {
+    return selector === '[data-nav]' ? { dataset: { nav } } : null;
+  } } });
+  const clickAction = action => listeners['document:click']({ target: { closest(selector) {
+    return selector === '[data-action]' ? { dataset: { action } } : null;
+  } } });
+
+  clickNav('connect');
+  assert.match(elements['#view'].innerHTML, /Soạn lời mời bằng Meta AI Web/);
+  elements['#moduleInput'] = { value: 'Người nhận viết về giáo dục tiểu học; tôi muốn kết nối để trao đổi kinh nghiệm.' };
+  elements['#modulePrompt'] = { value: 'Viết lời mời ngắn, không bịa quan hệ: {content}' };
+  elements['#moduleSourceUrl'] = { value: 'https://www.facebook.com/profile.php?id=123456' };
+  clickAction('generateModuleDraft');
+  await new Promise(resolve => setTimeout(resolve, 30));
+
+  assert.match(elements['#view'].innerHTML, /Chờ duyệt/);
+  assert.match(elements['#view'].innerHTML, /Mở liên kết/);
+  assert.match(elements['#view'].innerHTML, /Người nhận viết về giáo dục tiểu học/);
+  assert.match(elements['#view'].innerHTML, /không gửi lời mời/i);
+});
+
+test('opening selected groups respects the configured batch limit', async () => {
+  const initialState = Core.createDefaultState();
+  initialState.settings.groupLimit = 2;
+  initialState.settings.delay = 0;
+  initialState.groups = [
+    { id: 'g1', name: 'Group One', url: 'https://www.facebook.com/groups/one', selected: true },
+    { id: 'g2', name: 'Group Two', url: 'https://www.facebook.com/groups/two', selected: true },
+    { id: 'g3', name: 'Group Three', url: 'https://www.facebook.com/groups/three', selected: true }
+  ];
+  const { elements, listeners, openedTabs } = loadApp({ initialState });
+  await new Promise(resolve => setTimeout(resolve, 10));
+  const clickNav = nav => listeners['document:click']({ target: { closest(selector) {
+    return selector === '[data-nav]' ? { dataset: { nav } } : null;
+  } } });
+  const clickAction = action => listeners['document:click']({ target: { closest(selector) {
+    return selector === '[data-action]' ? { dataset: { action } } : null;
+  } } });
+
+  clickNav('groups');
+  clickAction('openSelectedGroups');
+  await new Promise(resolve => setTimeout(resolve, 20));
+  assert.equal(openedTabs.length, 2);
+  assert.equal(openedTabs[0].url, 'https://www.facebook.com/groups/one');
+  assert.equal(openedTabs[1].url, 'https://www.facebook.com/groups/two');
+  assert.match(elements['#toast'].textContent, /Đã mở 2 tab nhóm/);
 });

@@ -199,17 +199,23 @@ test('Meta AI draft moves through review queue and saves edits without publishin
   assert.equal(elements['#pageTitle'].textContent, 'Nuôi Page');
   assert.match(elements['#view'].innerHTML, /Bản nháp đã được duyệt sơ bộ/);
   assert.match(elements['#view'].innerHTML, /Lưu chỉnh sửa thành nháp/);
+  assert.match(elements['#view'].innerHTML, /id="pageLink" type="text" value=""/);
 
   elements['#pageMessage'] = { value: 'Nội dung đã được người dùng chỉnh sửa.' };
-  elements['#pageLink'] = { value: '' };
+  elements['#pageLink'] = { value: 'https://example.com/landing' };
   clickAction('savePageDraft');
   await new Promise(resolve => setTimeout(resolve, 10));
   assert.match(elements['#toast'].textContent, /Đã lưu bản nháp/);
 
+  assert.match(elements['#view'].innerHTML, /id="pageLink" type="text" value="https:\/\/example.com\/landing"/);
   clickNav('review');
   assert.match(elements['#view'].innerHTML, /Nội dung đã được người dùng chỉnh sửa/);
   assert.match(elements['#view'].innerHTML, /Chờ duyệt/);
   assert.match(elements['#view'].innerHTML, /Mở liên kết/);
+  const savedDraft = elements['#view'].innerHTML.match(/data-action="reviewDraft" data-id="([^"]+)"/);
+  assert.ok(savedDraft);
+  clickAction('reviewDraft', savedDraft[1]);
+  assert.match(elements['#view'].innerHTML, /id="pageLink" type="text" value="https:\/\/example.com\/landing"/);
 });
 
 

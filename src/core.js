@@ -151,7 +151,7 @@
       (draft.postId === undefined || isText(draft.postId, 100)) &&
       (draft.pageId === undefined || (isText(draft.pageId, 30) && /^[0-9]{5,30}$/.test(draft.pageId))) &&
       (draft.publishError === undefined || isText(draft.publishError, 1000)) &&
-      (draft.rejectionReason === undefined || isText(draft.rejectionReason, 500))) return false;
+      (draft.rejectionReason === undefined || isText(draft.rejectionReason, 500)))) return false;
     if (value.moduleNotes && !Object.entries(value.moduleNotes).every(entry =>
       isText(entry[0], 80) && isText(entry[1], 2000))) return false;
     return true;

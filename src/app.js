@@ -864,7 +864,7 @@
         const batch = selected.slice(0, limit);
         const delaySeconds = Math.min(5, Math.max(0, Number(state.settings.delay) || 0));
         const moreText = selected.length > batch.length ? ' Chỉ mở ' + batch.length + ' nhóm đầu tiên trong ' + selected.length + ' nhóm đã chọn.' : '';
-        if (!window.confirm('Mở ' + batch.length + ' tab nhóm Facebook để bạn thao tác thủ công?' + moreText + (delaySeconds ? ' Khoảng cách mở tab: ' + delaySeconds + ' giây.' : '')) return;
+        if (!window.confirm('Mở ' + batch.length + ' tab nhóm Facebook để bạn thao tác thủ công?' + moreText + (delaySeconds ? ' Khoảng cách mở tab: ' + delaySeconds + ' giây.' : ''))) return;
         for (let index = 0; index < batch.length; index += 1) {
           if (index > 0 && delaySeconds) await new Promise(resolve => setTimeout(resolve, delaySeconds * 1000));
           await chrome.tabs.create({ url: batch[index].url, active: false });

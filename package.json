@@ -1,6 +1,6 @@
 {
   "name": "facebook-ai-assistant",
-  "version": "0.6.0",
+  "version": "0.6.1",
   "private": true,
   "description": "Manifest V3 assistant using the Meta AI website through explicit browser UI automation, plus reviewed Facebook Page publishing",
   "scripts": {

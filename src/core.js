@@ -311,7 +311,7 @@
       ? 'Báo cáo 7 ngày (' + periodStart.toLocaleDateString('vi-VN') + ' – ' + periodEnd.toLocaleDateString('vi-VN') + '): ' + current.length + ' quan sát từ ' + groups.size + ' hồ sơ/nhóm định danh; ' + trend + ' so với 7 ngày trước (' + previous.length + ' quan sát). Phân bổ: ' + profileSummary + '. Báo cáo chỉ dựa trên nội dung người dùng chủ động thu thập và không suy đoán thuộc tính nhạy cảm.'
       : 'Báo cáo 7 ngày (' + periodStart.toLocaleDateString('vi-VN') + ' – ' + periodEnd.toLocaleDateString('vi-VN') + '): chưa có quan sát nào trong kỳ. Có ' + previous.length + ' quan sát trong 7 ngày liền trước. Hãy mở một bài viết Facebook và chủ động thu thập nội dung hiển thị nếu bạn có quyền truy cập.';
     return {
-      id: 'weekly-' + periodStart.toISOString().replace(/[:.]/g, '-'),
+      id: 'weekly-' + periodEnd.toISOString().slice(0, 10),
       periodStart: periodStart.toISOString(),
       periodEnd: periodEnd.toISOString(),
       createdAt: periodEnd.toISOString(),

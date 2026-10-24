@@ -145,3 +145,44 @@ test('navigation opens the AI and sales modules without runtime errors', async (
   assert.match(elements['#view'].innerHTML, /AI chỉ tạo bản nháp/);
   assert.match(elements['#view'].innerHTML, /reviewStatusFilter/);
 });
+
+
+test('Meta AI draft moves through review queue and saves edits without publishing', async () => {
+  const { elements, listeners } = loadApp();
+  await new Promise(resolve => setTimeout(resolve, 10));
+  const clickNav = nav => listeners['document:click']({ target: { closest(selector) {
+    return selector === '[data-nav]' ? { dataset: { nav } } : null;
+  } } });
+  const clickAction = (action, id) => listeners['document:click']({ target: { closest(selector) {
+    return selector === '[data-action]' ? { dataset: { action, id } } : null;
+  } } });
+
+  clickNav('scrape');
+  elements['#moduleInput'] = { value: 'Tóm tắt nội dung bài viết tôi cung cấp.' };
+  elements['#modulePrompt'] = { value: 'Tóm tắt ngắn gọn: {content}' };
+  elements['#moduleSourceUrl'] = { value: 'https://www.facebook.com/posts/123' };
+  clickAction('generateModuleDraft');
+  await new Promise(resolve => setTimeout(resolve, 30));
+
+  assert.match(elements['#view'].innerHTML, /Mở liên kết/);
+  assert.match(elements['#view'].innerHTML, /Chờ duyệt/);
+  const match = elements['#view'].innerHTML.match(/data-action="reviewDraft" data-id="([^"]+)"/);
+  assert.ok(match, 'generated draft should have a review action');
+  const draftId = match[1];
+
+  clickAction('reviewDraft', draftId);
+  await new Promise(resolve => setTimeout(resolve, 10));
+  assert.equal(elements['#pageTitle'].textContent, 'Nuôi Page');
+  assert.match(elements['#view'].innerHTML, /Bản nháp đã được duyệt sơ bộ/);
+  assert.match(elements['#view'].innerHTML, /Lưu chỉnh sửa thành nháp/);
+
+  elements['#pageMessage'] = { value: 'Nội dung đã được người dùng chỉnh sửa.' };
+  elements['#pageLink'] = { value: '' };
+  clickAction('savePageDraft');
+  await new Promise(resolve => setTimeout(resolve, 10));
+  assert.match(elements['#toast'].textContent, /Đã lưu bản nháp/);
+
+  clickNav('review');
+  assert.match(elements['#view'].innerHTML, /Nội dung đã được người dùng chỉnh sửa/);
+  assert.match(elements['#view'].innerHTML, /Chờ duyệt/);
+});

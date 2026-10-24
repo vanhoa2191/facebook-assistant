@@ -7,7 +7,8 @@ Chrome Extension Manifest V3 with a Vietnamese dashboard for managing Facebook c
 - Twelve navigation modules aligned with the reference screenshots.
 - Local group list management, selection, and safe URL validation.
 - Gemini API adapter with optional host permission, timeout, and session-only API key storage.
-- Manual Meta AI workflow: copy a prompt to another AI tool and save its result as a draft.
+- Meta AI Web UI integration (no Meta model API): request optional Chrome `scripting` and `meta.ai` host permissions, open the official website, fill the visible chat composer, send a prompt, wait for the response, and save the result as a local draft.
+- Manual copy/paste fallback remains available if Meta AI changes its interface or requires user action.
 - Group CSV import/export, per-group share drafts, manual group opening, a searchable draft library, and a manual engagement follow-up tracker.
 - Optional Facebook Pages Graph API publishing and native Meta scheduling, using a Page access token, explicit host permission, and confirmation before public actions.
 - AI-generated content and share copy are saved as drafts for review.
@@ -22,7 +23,17 @@ Chrome Extension Manifest V3 with a Vietnamese dashboard for managing Facebook c
 3. Enable Developer mode.
 4. Select Load unpacked and choose the directory containing manifest.json.
 
-## Configure Gemini
+## Configure Meta AI Web (no API)
+
+1. Open the AI chung module and click **Cấp quyền và mở Meta AI**. Approve Chrome's optional `scripting` and `meta.ai` website permissions.
+2. Sign in to Meta AI in the opened tab if the website asks you to. Do not share your Meta password with the extension.
+3. Return to the extension, select Meta AI Web as the AI provider, and enter the content or brief.
+4. Click the Meta AI Web generation button. The extension injects a small bridge into the visible `meta.ai` page, fills the chat input, clicks the site's Send button, waits for a stable answer, and saves that answer as a draft.
+5. Review/edit the draft. Publishing to a Facebook Page remains a separate action with a separate confirmation; Meta AI output is never automatically published.
+
+This is UI automation, not a supported Meta AI API. It uses the website session you already signed into and does not read cookies, extract session tokens, bypass login, CAPTCHA, rate limits, or access controls. Meta may change the web UI; if the extension cannot identify the composer, Send button, or answer, it stops with an error rather than guessing. Keep the Meta AI tab open and visible, and retry after completing any login or consent step. The prompt and source text are sent to Meta as part of the normal website chat when you click generate.
+
+## Configure Gemini (optional)
 
 1. Open the AI chung module and select Gemini API.
 2. Click Cấp quyền Gemini API and accept Chrome's permission prompt.
@@ -54,4 +65,4 @@ Requires Node.js 20 or newer. Run npm test, npm run validate, and npm run packag
 
 ## Data and privacy
 
-Application data is stored locally using chrome.storage.local. Exported JSON may contain group names and URLs, prompts, drafts, and reminders; review it before sharing. Gemini API keys and Page access tokens are deliberately excluded from exports.
+Application data is stored locally using chrome.storage.local. Exported JSON may contain group names and URLs, prompts, drafts, and reminders; review it before sharing. Gemini API keys and Page access tokens are deliberately excluded from exports. Meta AI Web uses your signed-in website session; the extension does not store Meta AI credentials or cookies.

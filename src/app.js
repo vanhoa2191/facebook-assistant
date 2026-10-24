@@ -212,7 +212,7 @@
         (draft.rejectionReason ? '<div class="banner">Lý do từ chối: ' + esc(draft.rejectionReason) + '</div>' : '') +
         '<p class="draft-text">' + esc(draft.text.slice(0, 1600)) + (draft.text.length > 1600 ? '…' : '') + '</p>' +
         (draft.postId ? '<small>Post ID: ' + esc(draft.postId) + (draft.pageId ? ' · Page ID: ' + esc(draft.pageId) : '') + '</small>' : '') +
-        '<div class="btnrow">' + (Core.isSafeFacebookUrl(draft.sourceUrl || draft.url) ? button('Mở liên kết', 'openDraftSource', '', draft.id) : '') + button('Sao chép', 'copyDraft', '', draft.id) + button('Sửa', 'editDraft', '', draft.id) +
+        '<div class="btnrow">' + (Core.isSafeFacebookUrl(draft.sourceUrl || draft.url) ? button('Mở liên kết', 'openDraftSource', '', draft.id) : '') + button('Sao chép', 'copyDraft', '', draft.id) + (!['published', 'scheduled'].includes(status) ? button('Sửa', 'editDraft', '', draft.id) : '') +
         (canReview ? button(status === 'approved' ? 'Tiếp tục duyệt Page' : 'Duyệt & soạn Page', 'reviewDraft', 'primary', draft.id) : '') +
         (['draft', 'approved', 'failed'].includes(status) ? button('Từ chối', 'rejectDraft', 'warn', draft.id) : '') +
         (['rejected', 'failed'].includes(status) ? button('Đưa về chờ duyệt', 'reopenDraft', '', draft.id) : '') +
@@ -1179,6 +1179,7 @@
       case 'editDraft': {
         const draft = state.drafts.find(item => item.id === id);
         if (!draft) { toast('Không tìm thấy bản nháp'); return; }
+        if (['published', 'scheduled'].includes(draft.reviewStatus)) { toast('Không thể sửa bản đã đăng hoặc đã lên lịch. Hãy tạo bản nháp mới.'); return; }
         const edited = window.prompt('Chỉnh sửa bản nháp', draft.text);
         if (edited === null) return;
         if (!edited.trim() || edited.length > 20000) { toast('Nội dung nháp phải có từ 1 đến 20.000 ký tự'); return; }
@@ -1190,10 +1191,15 @@
         log('Đã chỉnh sửa bản nháp');
         break;
       }
-      case 'deleteDraft':
-        state.drafts = state.drafts.filter(draft => draft.id !== id);
-        log('Đã xóa bản nháp');
+      case 'deleteDraft': {
+        const draft = state.drafts.find(item => item.id === id);
+        if (!draft) { toast('Không tìm thấy bản nháp.'); return; }
+        if (['published', 'scheduled'].includes(draft.reviewStatus) &&
+            !window.confirm('Xóa bản ghi theo dõi cục bộ? Bài đã đăng hoặc lịch Meta đã nhận sẽ không bị xóa khỏi Facebook.')) return;
+        state.drafts = state.drafts.filter(item => item.id !== id);
+        log('Đã xóa bản nháp hoặc bản ghi theo dõi cục bộ');
         break;
+      }
       case 'openPagePlanner': {
         const item = (state.pageSchedules || []).find(schedule => schedule.id === id);
         if (!item || !/^[0-9]{5,30}$/.test(item.pageId)) { toast('Không tìm thấy lịch Page hợp lệ.'); return; }

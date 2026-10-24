@@ -220,7 +220,7 @@
       '<div class="field"><label for="pageMessage">Nội dung bài viết — xem lại trước khi duyệt đăng</label><textarea id="pageMessage" maxlength="60000" placeholder="Kiểm tra kỹ nội dung trước khi đăng công khai...">' + esc(pageComposerDraft) + '</textarea></div>' +
       field('Link đính kèm (không bắt buộc, HTTPS)', 'pageLink', '') +
       field('Thời điểm đăng (để trống để đăng ngay)', 'pagePublishTime', '', 'datetime-local') +
-      button('Đăng ngay / lên lịch trên Page', 'publishPagePost', 'primary full') +
+      '<div class="btnrow">' + button('Lưu chỉnh sửa thành nháp', 'savePageDraft') + button('Đăng ngay / lên lịch trên Page', 'publishPagePost', 'primary') + '</div>' +
       '<div class="placeholder output">' + esc(pagePublishStatus || 'Chưa có kết quả đăng bài.') + '</div>' +
       '</section><section class="panel purple"><h2>Quy trình an toàn</h2><ol><li>Nhập Page ID và Page access token.</li><li>Cấp quyền truy cập Graph API khi Chrome hỏi.</li><li>Soạn bài và xem lại nội dung.</li><li>Xác nhận lần cuối trước khi đăng công khai.</li><li>Kiểm tra ID bài đăng trong nhật ký.</li></ol>' +
       '<div class="banner">Tích hợp này chỉ đăng lên Page được token cho phép. Không đăng lên trang cá nhân hoặc nhóm. Việc dùng API phụ thuộc vào quyền, cấu hình và xét duyệt ứng dụng Meta.</div>' +
@@ -541,6 +541,7 @@
       case 'useDraftForPage': {
         const draft = state.drafts.find(item => item.id === id);
         if (!draft) { toast('Không tìm thấy bản nháp.'); return; }
+        if (['published', 'scheduled'].includes(draft.reviewStatus)) { toast('Bản nháp này đã đăng hoặc đã lên lịch.'); return; }
         pageComposerDraft = draft.text;
         activePageDraftId = draft.id;
         if (!draft.approvedAt) { draft.reviewStatus = 'approved'; draft.approvedAt = new Date().toISOString(); }
@@ -1232,7 +1233,12 @@
     });
     document.addEventListener('click', event => {
       const navButton = event.target.closest('[data-nav]');
-      if (navButton) { page = navButton.dataset.nav; render(); return; }
+      if (navButton) {
+        page = navButton.dataset.nav;
+        if (page === 'pages') { activePageDraftId = null; pageComposerDraft = ''; pagePublishStatus = ''; }
+        render();
+        return;
+      }
       const actionButton = event.target.closest('[data-action]');
       if (actionButton) action(actionButton.dataset.action, actionButton.dataset.id).catch(() => toast('Không thể hoàn tất thao tác.'));
     });

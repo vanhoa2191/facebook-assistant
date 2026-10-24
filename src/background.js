@@ -140,7 +140,8 @@ chrome.alarms.onAlarm.addListener(async alarm => {
   await updateBadge(state);
   await notifyTaskDue(task);
 });
-chrome.notifications.onClicked.addListener(notificationId => {
+if (chrome.notifications && chrome.notifications.onClicked && typeof chrome.notifications.onClicked.addListener === 'function') {
+  chrome.notifications.onClicked.addListener(notificationId => {
   const id = String(notificationId);
   if (id.startsWith('faa-weekly-report:')) {
     chrome.tabs.create({ url: chrome.runtime.getURL('dashboard.html#analytics') });
@@ -149,7 +150,8 @@ chrome.notifications.onClicked.addListener(notificationId => {
     chrome.tabs.create({ url: chrome.runtime.getURL('dashboard.html#schedule') });
     chrome.notifications.clear(notificationId);
   }
-});
+  });
+}
 chrome.action.onClicked.addListener(() => {
   chrome.tabs.create({ url: chrome.runtime.getURL('dashboard.html') });
 });

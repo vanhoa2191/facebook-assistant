@@ -62,12 +62,20 @@ function loadApp(options) {
         if ((args.origins || []).some(origin => origin.includes('graph.facebook.com'))) return Boolean(settings.graphPermission);
         return false;
       },
-      request: async args => Array.isArray(args.permissions) && args.permissions.includes('notifications') && Boolean(settings.notificationsRequestGranted)
+      request: async args => {
+        if (Array.isArray(args.permissions) && args.permissions.includes('notifications')) return Boolean(settings.notificationsRequestGranted);
+        if ((args.origins || []).some(origin => origin.includes('facebook.com'))) return Boolean(settings.facebookCaptureGranted);
+        return false;
+      }
     },
     tabs: {
       create: async options => { openedTabs.push(options); return { id: openedTabs.length }; },
-      query: async () => [{ id: 7, url: 'https://www.meta.ai/', status: 'complete' }],
-      sendMessage: async () => ({ ok: true, text: 'Bản nháp Meta AI đã được tạo thành công.' })
+      query: async args => (args && Array.isArray(args.url) && args.url.some(url => url.includes('facebook.com'))
+        ? (settings.facebookTabs || [])
+        : [{ id: 7, url: 'https://www.meta.ai/', status: 'complete' }]),
+      sendMessage: async (tabId, message) => message && message.type === 'FAA_CAPTURE_VISIBLE_FACEBOOK_POST'
+        ? (settings.facebookCaptureResponse || { ok: true, sourceUrl: 'https://www.facebook.com/posts/123', text: 'A visible post with a comment and reply.', visibleArticleCount: 2, capturedAt: new Date().toISOString() })
+        : ({ ok: true, text: 'Bản nháp Meta AI đã được tạo thành công.' })
     },
     scripting: { executeScript: async () => [{}] }
   };
@@ -81,7 +89,7 @@ test('dashboard initializes and renders all 13 navigation modules', async () => 
   const { elements } = loadApp();
   await new Promise(resolve => setTimeout(resolve, 10));
   const sidebar = elements['#sidebar'].innerHTML;
-  assert.equal((sidebar.match(/data-nav=/g) || []).length, 13);
+  assert.equal((sidebar.match(/data-nav=/g) || []).length, 14);
   assert.equal(elements['#pageTitle'].textContent, 'Quản lý nhóm và tương tác');
   assert.match(elements['#view'].innerHTML, /Thêm nhóm/);
   assert.match(elements['#view'].innerHTML, /Theo dõi tương tác/);
@@ -332,4 +340,61 @@ test('reminder creation rejects a date in the past', async () => {
   clickAction('addTask');
   await new Promise(resolve => setTimeout(resolve, 10));
   assert.match(elements['#toast'].textContent, /ở trong tương lai/);
+});
+
+
+test('capture current visible Facebook post and comments into a locally assigned profile observation', async () => {
+  const initialState = Core.createDefaultState();
+  initialState.contacts.push({
+    id: 'contact-1', name: 'Alice Example',
+    url: 'https://www.facebook.com/profile.php?id=123456',
+    note: 'Shared teaching interests', status: 'opened',
+    createdAt: '2026-10-24T01:00:00.000Z'
+  });
+  const { elements, listeners } = loadApp({
+    initialState,
+    facebookCaptureGranted: true,
+    facebookTabs: [{ id: 12, url: 'https://www.facebook.com/groups/123/posts/456', status: 'complete', lastAccessed: 100 }],
+    facebookCaptureResponse: {
+      ok: true, sourceUrl: 'https://www.facebook.com/groups/123/posts/456',
+      text: 'Bài viết đang hiển thị\\nBình luận thứ nhất\\nPhản hồi lồng nhau',
+      visibleArticleCount: 3, capturedAt: '2026-10-24T02:00:00.000Z'
+    }
+  });
+  await new Promise(resolve => setTimeout(resolve, 10));
+  const clickNav = nav => listeners['document:click']({ target: { closest(selector) {
+    return selector === '[data-nav]' ? { dataset: { nav } } : null;
+  } } });
+  const clickAction = (action, id) => listeners['document:click']({ target: { closest(selector) {
+    return selector === '[data-action]' ? { dataset: { action, id } } : null;
+  } } });
+
+  clickNav('scrape');
+  elements['#observationContactId'] = { value: 'contact-1' };
+  clickAction('captureCurrentFacebookPost');
+  await new Promise(resolve => setTimeout(resolve, 30));
+  assert.match(elements['#view'].innerHTML, /Alice Example/);
+  assert.match(elements['#view'].innerHTML, /Bình luận thứ nhất/);
+  assert.match(elements['#view'].innerHTML, /Phản hồi lồng nhau/);
+  assert.match(elements['#view'].innerHTML, /Đã lưu quan sát/);
+  assert.match(elements['#view'].innerHTML, /Mở nguồn/);
+
+  const observation = elements['#view'].innerHTML.match(/data-action="analyzeObservation" data-id="([^"]+)"/);
+  assert.ok(observation, 'captured observation should expose an AI analysis action');
+  clickAction('analyzeObservation', observation[1]);
+  await new Promise(resolve => setTimeout(resolve, 40));
+  assert.match(elements['#view'].innerHTML, /Phân tích AI/);
+  assert.match(elements['#view'].innerHTML, /Bản nháp Meta AI đã được tạo thành công/);
+});
+
+test('analytics module exposes local weekly report and Excel-compatible CSV export', async () => {
+  const { elements, listeners } = loadApp();
+  await new Promise(resolve => setTimeout(resolve, 10));
+  listeners['document:click']({ target: { closest(selector) {
+    return selector === '[data-nav]' ? { dataset: { nav: 'analytics' } } : null;
+  } } });
+  assert.equal(elements['#pageTitle'].textContent, 'Phân tích & báo cáo');
+  assert.match(elements['#view'].innerHTML, /Tổng hợp ngay bằng AI/);
+  assert.match(elements['#view'].innerHTML, /Xuất báo cáo CSV \(Excel\)/);
+  assert.match(elements['#view'].innerHTML, /Báo cáo 7 ngày/);
 });

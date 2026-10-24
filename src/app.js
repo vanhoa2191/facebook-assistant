@@ -71,7 +71,7 @@
       (draft.targetGroupName ? '<div class="draft-target">Nhóm đích: ' + esc(draft.targetGroupName) + '</div>' : '') +
       '<p class="draft-text">' + esc(draft.text.slice(0, 700)) + (draft.text.length > 700 ? '…' : '') + '</p>' +
       '<div class="btnrow">' + button('Sao chép', 'copyDraft', '', draft.id) + button('Sửa', 'editDraft', '', draft.id) +
-      (draft.url && Core.isSafeFacebookUrl(draft.url) ? button('Mở liên kết', 'openDraftSource', '', draft.id) : '') +
+      (Core.isSafeFacebookUrl(draft.sourceUrl || draft.url) ? button('Mở liên kết', 'openDraftSource', '', draft.id) : '') +
       (draft.targetGroupUrl ? button('Mở nhóm', 'openDraftGroup', '', draft.id) : '') +
       button('Duyệt bài', 'reviewDraft', '', draft.id) + button('Dùng cho Page', 'useDraftForPage', '', draft.id) +
       button('Xóa', 'deleteDraft', 'warn', draft.id) + '</div></article>'
@@ -298,7 +298,7 @@
           (draft.targetGroupName ? '<div class="draft-target">Nhóm đích: ' + esc(draft.targetGroupName) + '</div>' : '') +
           '<p class="draft-text">' + esc(draft.text.slice(0, 700)) + (draft.text.length > 700 ? '…' : '') + '</p>' +
           '<div class="btnrow">' + button('Sao chép', 'copyDraft', '', draft.id) + button('Sửa', 'editDraft', '', draft.id) +
-          (draft.url && Core.isSafeFacebookUrl(draft.url) ? button('Mở liên kết', 'openDraftSource', '', draft.id) : '') +
+          (Core.isSafeFacebookUrl(draft.sourceUrl || draft.url) ? button('Mở liên kết', 'openDraftSource', '', draft.id) : '') +
       (draft.targetGroupUrl ? button('Mở nhóm', 'openDraftGroup', '', draft.id) : '') +
           button('Xóa', 'deleteDraft', 'warn', draft.id) + '</div></article>'
         ).join('') + '</div>'
@@ -617,6 +617,7 @@
         let draft = activePageDraftId ? state.drafts.find(item => item.id === activePageDraftId) : null;
         if (draft) {
           draft.text = message;
+          if (draft.url && !draft.sourceUrl) draft.sourceUrl = draft.url;
           draft.url = link;
           draft.updatedAt = new Date().toISOString();
           draft.reviewStatus = 'draft';
@@ -680,14 +681,14 @@
             if (state.pageSchedules.length > 500) state.pageSchedules.shift();
             if (activePageDraftId) {
               const draft = state.drafts.find(item => item.id === activePageDraftId);
-              if (draft) { draft.text = message; draft.reviewStatus = 'scheduled'; draft.scheduledAt = result.scheduledAt || scheduledPublishAt; draft.pageId = pageId; draft.postId = result.id; draft.publishError = ''; draft.updatedAt = new Date().toISOString(); }
+              if (draft) { draft.text = message; if (draft.url && !draft.sourceUrl) draft.sourceUrl = draft.url; draft.url = link; draft.reviewStatus = 'scheduled'; draft.scheduledAt = result.scheduledAt || scheduledPublishAt; draft.pageId = pageId; draft.postId = result.id; draft.publishError = ''; draft.updatedAt = new Date().toISOString(); }
             }
             pagePublishStatus = 'Đã gửi lịch đăng tới Meta. Post ID: ' + result.id;
             log('Đã lên lịch đăng Page ' + pageId + ' vào ' + (result.scheduledAt || scheduledPublishAt) + '; Post ID: ' + result.id);
           } else {
             if (activePageDraftId) {
               const draft = state.drafts.find(item => item.id === activePageDraftId);
-              if (draft) { draft.text = message; draft.reviewStatus = 'published'; draft.publishedAt = new Date().toISOString(); draft.pageId = pageId; draft.postId = result.id; draft.publishError = ''; draft.updatedAt = new Date().toISOString(); }
+              if (draft) { draft.text = message; if (draft.url && !draft.sourceUrl) draft.sourceUrl = draft.url; draft.url = link; draft.reviewStatus = 'published'; draft.publishedAt = new Date().toISOString(); draft.pageId = pageId; draft.postId = result.id; draft.publishError = ''; draft.updatedAt = new Date().toISOString(); }
             }
             pagePublishStatus = 'Đăng thành công. Post ID: ' + result.id;
             log('Đã đăng bài lên Page ' + pageId + '; Post ID: ' + result.id);
@@ -832,8 +833,9 @@
       }
       case 'openDraftSource': {
         const draft = state.drafts.find(item => item.id === id);
-        if (!draft || !Core.isSafeFacebookUrl(draft.url)) { toast('Bản nháp chưa có URL bài gốc hợp lệ.'); return; }
-        await chrome.tabs.create({ url: draft.url });
+        const sourceUrl = draft && (draft.sourceUrl || draft.url);
+        if (!draft || !Core.isSafeFacebookUrl(sourceUrl)) { toast('Bản nháp chưa có URL Facebook hợp lệ.'); return; }
+        await chrome.tabs.create({ url: sourceUrl });
         log('Đã mở bài gốc của bản nháp');
         break;
       }

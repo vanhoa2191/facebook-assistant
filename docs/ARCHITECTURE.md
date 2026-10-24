@@ -6,13 +6,13 @@
 - src/ai-provider.js: optional Gemini API adapter with model validation, timeout, response parsing, and normalized errors.
 - src/meta-ai-bridge.js: on-demand UI bridge injected into the signed-in meta.ai tab after optional permissions are granted; interacts with visible DOM controls and extracts a stable answer without calling a model API.
 - src/facebook-provider.js: versioned Facebook Pages Graph API adapter with token in POST body, timeout, and normalized errors.
-- src/app.js: navigation, group list, AI generation, drafts, reminders, import/export, and logs.
+- src/app.js: navigation, group list, AI generation, draft review queue, approval lifecycle, Page publishing and scheduling, reminders, import/export, and logs.
 - src/background.js: extension lifecycle, reminder alarms, and action badge.
 - tests/: deterministic Node.js unit tests.
 - scripts/: extension validation and ZIP packaging.
 - .github/workflows/ci.yml: GitHub Actions validation and package workflow.
 
-Application state, manual engagement follow-up items, reminder tasks, and local records of Meta-scheduled Page posts are stored in chrome.storage.local. Gemini API key and Facebook Page access token are stored separately in chrome.storage.session and are never included in exports or logs. Meta AI Web integration stores no Meta credentials or cookies. The key remains accessible to the extension during the current Chrome session.
+Application state, manual engagement follow-up items, reminder tasks, local records of Meta-scheduled Page posts, and draft approval/publishing lifecycle are stored in chrome.storage.local. Legacy drafts are migrated to the `draft` review status. Gemini API key and Facebook Page access token are stored separately in chrome.storage.session and are never included in exports or logs. Meta AI Web integration stores no Meta credentials or cookies. The key remains accessible to the extension during the current Chrome session.
 
 Gemini permission is optional and requested after a user gesture. Requests use HTTPS, send the key in the x-goog-api-key header rather than the URL, apply a timeout, and limit prompt size. Google receives the prompt and input text when a request is made.
 

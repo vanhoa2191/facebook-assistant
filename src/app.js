@@ -237,7 +237,7 @@
       '<div class="banner">Cần Page access token hợp lệ và quyền pages_manage_posts do Meta cấp cho ứng dụng của bạn. Token không được xuất ra file cấu hình hoặc ghi vào nhật ký. Khi đăng bài, nội dung được gửi tới Meta.</div>' +
       '<div class="field"><label for="pageAiBrief">Mô tả để Meta AI soạn bài</label><textarea id="pageAiBrief" maxlength="10000" placeholder="Mục tiêu, đối tượng, ý chính, ưu đãi..."></textarea></div>' +
       button('Soạn bài bằng Meta AI Web', 'generateMetaPageDraft', 'primary full') +
-      '<div class="field"><label for="pageMessage">Nội dung bài viết — xem lại trước khi duyệt đăng</label><textarea id="pageMessage" maxlength="60000" placeholder="Kiểm tra kỹ nội dung trước khi đăng công khai...">' + esc(pageComposerDraft) + '</textarea></div>' +
+      '<div class="field"><label for="pageMessage">Nội dung bài viết — xem lại trước khi duyệt đăng</label><textarea id="pageMessage" maxlength="20000" placeholder="Kiểm tra kỹ nội dung trước khi đăng công khai...">' + esc(pageComposerDraft) + '</textarea></div>' +
       field('Link đính kèm (không bắt buộc, HTTPS)', 'pageLink', '') +
       field('Thời điểm đăng (để trống để đăng ngay)', 'pagePublishTime', '', 'datetime-local') +
       '<div class="btnrow">' + button('Lưu chỉnh sửa thành nháp', 'savePageDraft') + button('Đăng ngay / lên lịch trên Page', 'publishPagePost', 'primary') + '</div>' +
@@ -651,7 +651,7 @@
           scheduledPublishAt = scheduleDate.toISOString();
         }
         if (!/^[0-9]{5,30}$/.test(pageId)) { toast('Nhập Page ID hợp lệ trước khi đăng.'); return; }
-        if (!message || message.length > 60000) { toast('Nội dung bài viết phải có từ 1 đến 60.000 ký tự.'); return; }
+        if (!message || message.length > 20000) { toast('Nội dung bài viết phải có từ 1 đến 20.000 ký tự.'); return; }
         if (link) {
           let validLink = false;
           try { validLink = new URL(link).protocol === 'https:' && link.length <= 2048; } catch (_) {}
@@ -666,6 +666,12 @@
           ? 'Bạn đang lên lịch đăng công khai lên Facebook Page ' + pageId + ' vào ' + scheduledPublishAt + '. Meta sẽ quản lý thời điểm đăng sau khi xác nhận. Tiếp tục?'
           : 'Bạn đang đăng công khai lên Facebook Page ' + pageId + '. Sau khi xác nhận, bài viết sẽ được gửi tới Meta. Tiếp tục?';
         if (!window.confirm(confirmText)) return;
+        if (!activePageDraftId) {
+          const draft = addDraft(message, link, 'source');
+          activePageDraftId = draft.id;
+          draft.reviewStatus = 'approved';
+          draft.approvedAt = new Date().toISOString();
+        }
         state.settings.pageId = pageId;
         state.settings.graphVersion = version;
         pageComposerDraft = message;

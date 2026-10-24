@@ -71,7 +71,7 @@
       (draft.targetGroupName ? '<div class="draft-target">Nhóm đích: ' + esc(draft.targetGroupName) + '</div>' : '') +
       '<p class="draft-text">' + esc(draft.text.slice(0, 700)) + (draft.text.length > 700 ? '…' : '') + '</p>' +
       '<div class="btnrow">' + button('Sao chép', 'copyDraft', '', draft.id) + button('Sửa', 'editDraft', '', draft.id) +
-      (Core.isSafeFacebookUrl(draft.sourceUrl || draft.url) ? button('Mở liên kết', 'openDraftSource', '', draft.id) : '') +
+      (Core.isSafeHttpsUrl(draft.sourceUrl || draft.url) ? button('Mở liên kết', 'openDraftSource', '', draft.id) : '') +
       (draft.targetGroupUrl ? button('Mở nhóm', 'openDraftGroup', '', draft.id) : '') +
       button('Duyệt bài', 'reviewDraft', '', draft.id) + button('Dùng cho Page', 'useDraftForPage', '', draft.id) +
       button('Xóa', 'deleteDraft', 'warn', draft.id) + '</div></article>'
@@ -81,7 +81,7 @@
 
   function modulePromptKey() {
     return ({
-      connect: 'comment',
+      connect: 'connect',
       scrape: 'summary',
       pages: 'feed',
       sales: 'sales',
@@ -132,11 +132,20 @@
       (contact.status !== 'follow_up' ? button('Theo dõi lại', 'markContactFollowUp', '', contact.id) : '') +
       button('Không tiếp tục', 'markContactDeclined', '', contact.id) + button('Xóa', 'deleteContact', 'warn', contact.id) + '</div></article>'
     ).join('') : '<div class="placeholder">Chưa có hồ sơ nào. Thêm người cần liên hệ để theo dõi thủ công.</div>';
+    const connectPrompt = state.prompts.connect || 'Soạn lời mời kết nối ngắn gọn, lịch sự dựa trên thông tin được cung cấp: {content}';
     return '<div class="grid"><section class="panel blue"><h2>Danh sách liên hệ</h2><p>Quản lý hồ sơ và trạng thái liên hệ thủ công</p>' +
       field('Tên người liên hệ', 'contactName', '') + field('URL hồ sơ Facebook', 'contactUrl', '') +
       '<div class="field"><label for="contactNote">Ghi chú / lý do kết nối</label><textarea id="contactNote" maxlength="1000" placeholder="Bối cảnh, mối quan tâm chung, việc cần theo dõi..."></textarea></div>' +
       button('Thêm vào danh sách', 'addContact', 'primary full') +
       '<div class="banner">Extension không tự gửi lời mời kết bạn. Mở hồ sơ và gửi lời mời thủ công trên Facebook; sau đó cập nhật trạng thái tại đây.</div></section>' +
+      '<section class="panel purple"><h2>Soạn lời mời bằng AI</h2><p>Tạo lời mời lịch sự dựa trên thông tin bạn cung cấp. Không gửi tự động.</p>' +
+      '<div class="field"><label for="modulePrompt">Prompt</label><textarea id="modulePrompt" maxlength="20000">' + esc(connectPrompt) + '</textarea></div>' +
+      '<div class="field"><label for="moduleInput">Thông tin về người nhận và bối cảnh kết nối</label><textarea id="moduleInput" maxlength="20000" placeholder="Nêu thông tin công khai liên quan và lý do bạn muốn kết nối..."></textarea></div>' +
+      field('URL hồ sơ tham chiếu (không bắt buộc)', 'moduleSourceUrl', '') +
+      '<div class="btnrow">' + button(state.settings.provider === 'gemini' ? 'Soạn lời mời bằng Gemini' : 'Soạn lời mời bằng Meta AI Web', 'generateModuleDraft', 'primary') + button('Sao chép prompt', 'copyModulePrompt') + '</div>' +
+      '<div class="field"><label for="moduleOutput">Kết quả AI bên ngoài (nếu cần)</label><textarea id="moduleOutput" maxlength="20000" placeholder="Dán lời mời đã tạo bên ngoài..."></textarea></div>' +
+      '<div class="btnrow">' + button('Lưu kết quả AI thành nháp', 'saveModuleOutputDraft') + button('Lưu nội dung đầu vào', 'saveModuleDraft') + '</div>' +
+      '<div class="banner">Kiểm tra thông tin và giọng điệu trước khi sử dụng. Extension không gửi lời mời, tin nhắn hoặc yêu cầu kết bạn.</div><h3>Nháp gần đây</h3>' + draftList(5) + '</section>' +
       '<section class="panel"><h2>Hồ sơ đã lưu</h2><p>' + contacts.length + ' liên hệ</p>' + list + '</section></div>';
   }
   function renderGroups() {
@@ -150,9 +159,9 @@
       : '<div class="placeholder">Chưa có mục nào. Thêm URL để theo dõi và xử lý thủ công.</div>';
     return '<div class="grid four">' +
       '<section class="panel"><h2>Quản lý nhóm</h2><p>Danh sách nhóm do bạn nhập thủ công</p><div class="metric"><div><small>Tổng nhóm</small>' + state.groups.length + '</div><div><small>Đã chọn</small>' + state.groups.filter(g => g.selected).length + '</div></div>' +
-      groupList() + '<div class="btnrow">' + button('Mở tối đa 5 nhóm đã chọn', 'openSelectedGroups') + button('Chọn tất cả', 'selectAll') + button('Bỏ chọn', 'deselectAll') + '</div>' +
+      groupList() + '<div class="btnrow">' + button('Mở nhóm đã chọn (theo cấu hình)', 'openSelectedGroups') + button('Chọn tất cả', 'selectAll') + button('Bỏ chọn', 'deselectAll') + '</div>' +
       '<div class="btnrow">' + button('Nhập CSV', 'importGroups') + button('Xuất CSV', 'exportGroups') + '</div>' +
-      field('Số nhóm mỗi đợt (cấu hình)', 'groupLimit', state.settings.groupLimit, 'number') + field('Khoảng cách (giây)', 'delay', state.settings.delay, 'number') +
+      field('Số nhóm mỗi đợt (1–10)', 'groupLimit', state.settings.groupLimit, 'number') + field('Khoảng cách mở tab (0–5 giây)', 'delay', state.settings.delay, 'number') +
       '<div class="banner">Chỉ mở tab nhóm để bạn tự xem và thao tác. Extension không tự đăng, bình luận hoặc gửi lời mời.</div>' + button('Lưu cấu hình', 'saveSettings', 'primary full') + '</section>' +
       '<section class="panel"><h2>Theo dõi tương tác</h2><p>Danh sách thủ công để bạn tự mở bài và xử lý</p>' +
       field('Tên người / bài viết', 'engagementName', '') + field('URL Facebook', 'engagementUrl', '') +
@@ -212,7 +221,7 @@
         (draft.rejectionReason ? '<div class="banner">Lý do từ chối: ' + esc(draft.rejectionReason) + '</div>' : '') +
         '<p class="draft-text">' + esc(draft.text.slice(0, 1600)) + (draft.text.length > 1600 ? '…' : '') + '</p>' +
         (draft.postId ? '<small>Post ID: ' + esc(draft.postId) + (draft.pageId ? ' · Page ID: ' + esc(draft.pageId) : '') + '</small>' : '') +
-        '<div class="btnrow">' + (Core.isSafeFacebookUrl(draft.sourceUrl || draft.url) ? button('Mở liên kết', 'openDraftSource', '', draft.id) : '') + button('Sao chép', 'copyDraft', '', draft.id) + (!['published', 'scheduled'].includes(status) ? button('Sửa', 'editDraft', '', draft.id) : '') +
+        '<div class="btnrow">' + (Core.isSafeHttpsUrl(draft.sourceUrl || draft.url) ? button('Mở liên kết', 'openDraftSource', '', draft.id) : '') + button('Sao chép', 'copyDraft', '', draft.id) + (!['published', 'scheduled'].includes(status) ? button('Sửa', 'editDraft', '', draft.id) : '') +
         (canReview ? button(status === 'approved' ? 'Tiếp tục duyệt Page' : 'Duyệt & soạn Page', 'reviewDraft', 'primary', draft.id) : '') +
         (['draft', 'approved', 'failed'].includes(status) ? button('Từ chối', 'rejectDraft', 'warn', draft.id) : '') +
         (['rejected', 'failed'].includes(status) ? button('Đưa về chờ duyệt', 'reopenDraft', '', draft.id) : '') +
@@ -255,7 +264,7 @@
       '<div class="field"><label for="shareExternalOutput">Kết quả từ Meta AI hoặc AI bên ngoài</label><textarea id="shareExternalOutput" maxlength="20000" placeholder="Dán lời dẫn đã tạo ở bên ngoài..."></textarea></div>' +
       '<div class="btnrow">' + button('Lưu kết quả thành nháp chia sẻ', 'saveExternalShareDraft') + button('Lưu nội dung nguồn', 'saveShare') + '</div>' +
       '<div class="banner">Tạo tối đa 5 bản nháp mỗi lượt để kiểm soát chi phí AI. Mỗi bản nháp gắn với một nhóm; bạn cần tự xem lại và đăng thủ công.</div></section>' +
-      '<section class="panel"><h2>Chọn nhóm nhận bài</h2>' + groupList() + button('Mở tối đa 5 nhóm đã chọn', 'openSelectedGroups') + ' ' + button('Chọn tất cả', 'selectAll') + ' ' + button('Bỏ chọn', 'deselectAll') +
+      '<section class="panel"><h2>Chọn nhóm nhận bài</h2>' + groupList() + button('Mở nhóm đã chọn (theo cấu hình)', 'openSelectedGroups') + ' ' + button('Chọn tất cả', 'selectAll') + ' ' + button('Bỏ chọn', 'deselectAll') +
       '<h3>Thư viện bản nháp</h3>' + draftList(10) + '</section></div>';
   }
 
@@ -298,7 +307,7 @@
           (draft.targetGroupName ? '<div class="draft-target">Nhóm đích: ' + esc(draft.targetGroupName) + '</div>' : '') +
           '<p class="draft-text">' + esc(draft.text.slice(0, 700)) + (draft.text.length > 700 ? '…' : '') + '</p>' +
           '<div class="btnrow">' + button('Sao chép', 'copyDraft', '', draft.id) + button('Sửa', 'editDraft', '', draft.id) +
-          (Core.isSafeFacebookUrl(draft.sourceUrl || draft.url) ? button('Mở liên kết', 'openDraftSource', '', draft.id) : '') +
+          (Core.isSafeHttpsUrl(draft.sourceUrl || draft.url) ? button('Mở liên kết', 'openDraftSource', '', draft.id) : '') +
       (draft.targetGroupUrl ? button('Mở nhóm', 'openDraftGroup', '', draft.id) : '') +
           button('Xóa', 'deleteDraft', 'warn', draft.id) + '</div></article>'
         ).join('') + '</div>'
@@ -478,9 +487,9 @@
       case 'saveSettings': {
         const groupLimit = Number($('#groupLimit') ? $('#groupLimit').value : state.settings.groupLimit);
         const delay = Number($('#delay') ? $('#delay').value : state.settings.delay);
-        if (!Number.isFinite(groupLimit) || groupLimit < 1 || groupLimit > 10000 ||
-            !Number.isFinite(delay) || delay < 0 || delay > 86400) {
-          toast('Số nhóm phải từ 1–10000 và khoảng cách từ 0–86400 giây.');
+        if (!Number.isFinite(groupLimit) || groupLimit < 1 || groupLimit > 10 ||
+            !Number.isFinite(delay) || delay < 0 || delay > 5) {
+          toast('Số nhóm mỗi đợt phải từ 1–10 và khoảng cách mở tab từ 0–5 giây.');
           return;
         }
         state.settings.groupLimit = Math.floor(groupLimit);
@@ -609,11 +618,7 @@
         const message = $('#pageMessage').value.trim();
         const link = $('#pageLink').value.trim();
         if (!message || message.length > 20000) { toast('Bản nháp phải có từ 1 đến 20.000 ký tự.'); return; }
-        if (link) {
-          let validLink = false;
-          try { validLink = new URL(link).protocol === 'https:' && link.length <= 2048; } catch (_) {}
-          if (!validLink) { toast('Link phải là HTTPS hợp lệ.'); return; }
-        }
+        if (link && !Core.isSafeHttpsUrl(link)) { toast('Link phải là HTTPS hợp lệ, không chứa thông tin đăng nhập.'); return; }
         let draft = activePageDraftId ? state.drafts.find(item => item.id === activePageDraftId) : null;
         if (draft) {
           draft.text = message;
@@ -654,7 +659,7 @@
         if (!message || message.length > 20000) { toast('Nội dung bài viết phải có từ 1 đến 20.000 ký tự.'); return; }
         if (link) {
           let validLink = false;
-          try { validLink = new URL(link).protocol === 'https:' && link.length <= 2048; } catch (_) {}
+          validLink = Core.isSafeHttpsUrl(link);
           if (!validLink) { toast('Link đính kèm phải là HTTPS hợp lệ.'); return; }
         }
         if (!/^v[0-9]{1,2}\.0$/.test(version)) { toast('Phiên bản Graph API không hợp lệ.'); return; }
@@ -840,7 +845,7 @@
       case 'openDraftSource': {
         const draft = state.drafts.find(item => item.id === id);
         const sourceUrl = draft && (draft.sourceUrl || draft.url);
-        if (!draft || !Core.isSafeFacebookUrl(sourceUrl)) { toast('Bản nháp chưa có URL Facebook hợp lệ.'); return; }
+        if (!draft || !Core.isSafeHttpsUrl(sourceUrl)) { toast('Bản nháp chưa có URL HTTPS hợp lệ.'); return; }
         await chrome.tabs.create({ url: sourceUrl });
         log('Đã mở bài gốc của bản nháp');
         break;
@@ -855,9 +860,15 @@
       case 'openSelectedGroups': {
         const selected = state.groups.filter(group => group.selected && Core.isSafeFacebookGroupUrl(group.url));
         if (!selected.length) { toast('Hãy chọn ít nhất một nhóm'); return; }
-        const batch = selected.slice(0, 5);
-        if (!window.confirm('Mở ' + batch.length + ' tab nhóm Facebook để bạn thao tác thủ công?')) return;
-        for (const group of batch) await chrome.tabs.create({ url: group.url, active: false });
+        const limit = Math.min(10, Math.max(1, Number(state.settings.groupLimit) || 5));
+        const batch = selected.slice(0, limit);
+        const delaySeconds = Math.min(5, Math.max(0, Number(state.settings.delay) || 0));
+        const moreText = selected.length > batch.length ? ' Chỉ mở ' + batch.length + ' nhóm đầu tiên trong ' + selected.length + ' nhóm đã chọn.' : '';
+        if (!window.confirm('Mở ' + batch.length + ' tab nhóm Facebook để bạn thao tác thủ công?' + moreText + (delaySeconds ? ' Khoảng cách mở tab: ' + delaySeconds + ' giây.' : '')) return;
+        for (let index = 0; index < batch.length; index += 1) {
+          if (index > 0 && delaySeconds) await new Promise(resolve => setTimeout(resolve, delaySeconds * 1000));
+          await chrome.tabs.create({ url: batch[index].url, active: false });
+        }
         log('Đã mở ' + batch.length + ' tab nhóm đã chọn');
         toast('Đã mở ' + batch.length + ' tab nhóm');
         break;
@@ -874,7 +885,7 @@
         const postText = $('#postText').value.trim();
         const postUrl = $('#postUrl').value.trim();
         if (!postText || postText.length > 20000) { toast('Nhập nội dung bài gốc hợp lệ'); return; }
-        if (postUrl && (!/^https:\/\/(www\.)?facebook\.com\//i.test(postUrl) || postUrl.length > 2048)) {
+        if (postUrl && (!Core.isSafeFacebookUrl(postUrl) || postUrl.length > 2048)) {
           toast('Link bài viết phải là HTTPS trên facebook.com');
           return;
         }
@@ -1042,7 +1053,7 @@
         const postText = $('#postText').value.trim();
         const postUrl = $('#postUrl').value.trim();
         if (!postText || postText.length > 20000) { toast('Nhập nội dung bài gốc hợp lệ'); return; }
-        if (postUrl && (!/^https:\/\/(www\.)?facebook\.com\//i.test(postUrl) || postUrl.length > 2048)) {
+        if (postUrl && (!Core.isSafeFacebookUrl(postUrl) || postUrl.length > 2048)) {
           toast('Link bài viết phải là HTTPS trên facebook.com'); return;
         }
         state.prompts.share = $('#sharePrompt').value.slice(0, 20000);
@@ -1120,7 +1131,7 @@
         if (!output || output.length > 20000) { toast('Dán kết quả AI hợp lệ trước khi lưu'); return; }
         if (sourceUrl) {
           let validSource = false;
-          try { validSource = new URL(sourceUrl).protocol === 'https:' && sourceUrl.length <= 2048; } catch (_) {}
+          validSource = Core.isSafeHttpsUrl(sourceUrl);
           if (!validSource) { toast('Link nguồn phải là HTTPS hợp lệ.'); return; }
         }
         addDraft(output, sourceUrl, 'ai');
@@ -1148,7 +1159,7 @@
         const output = $('#shareExternalOutput').value.trim();
         const postUrl = $('#postUrl').value.trim();
         if (!output || output.length > 20000) { toast('Dán kết quả AI hợp lệ trước khi lưu'); return; }
-        if (postUrl && (!/^https:\/\/(www\.)?facebook\.com\//i.test(postUrl) || postUrl.length > 2048)) {
+        if (postUrl && (!Core.isSafeFacebookUrl(postUrl) || postUrl.length > 2048)) {
           toast('Link bài viết phải là HTTPS trên facebook.com'); return;
         }
         const selected = state.groups.filter(group => group.selected && Core.isSafeFacebookGroupUrl(group.url));
@@ -1246,7 +1257,7 @@
         if (!input || input.length > 20000) { toast('Nhập nội dung đầu vào hợp lệ'); return; }
         if (sourceUrl) {
           let validSource = false;
-          try { validSource = new URL(sourceUrl).protocol === 'https:' && sourceUrl.length <= 2048; } catch (_) {}
+          validSource = Core.isSafeHttpsUrl(sourceUrl);
           if (!validSource) { toast('Link nguồn phải là HTTPS hợp lệ.'); return; }
         }
         const promptKey = modulePromptKey();
@@ -1276,7 +1287,7 @@
         if (!input || input.length > 20000) { toast('Nhập nội dung đầu vào hợp lệ'); return; }
         if (sourceUrl) {
           let validSource = false;
-          try { validSource = new URL(sourceUrl).protocol === 'https:' && sourceUrl.length <= 2048; } catch (_) {}
+          validSource = Core.isSafeHttpsUrl(sourceUrl);
           if (!validSource) { toast('Link nguồn phải là HTTPS hợp lệ.'); return; }
         }
         const promptKey = modulePromptKey();

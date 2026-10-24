@@ -49,8 +49,14 @@
         ? { ...task, status: 'scheduled' } : task);
     }
     if (Array.isArray(value.drafts)) {
-      migrated.drafts = value.drafts.map(draft => isObject(draft) && !draft.reviewStatus
-        ? { ...draft, reviewStatus: 'draft' } : draft);
+      migrated.drafts = value.drafts.map(draft => {
+        if (!isObject(draft)) return draft;
+        const next = { ...draft };
+        if (!next.reviewStatus) next.reviewStatus = 'draft';
+        if (next.pageLink === undefined && ['scheduled', 'published'].includes(next.reviewStatus) &&
+            next.pageId && next.postId) next.pageLink = next.url || '';
+        return next;
+      });
     }
     if (migrated.settings.provider === 'demo') migrated.settings.provider = 'meta';
     const groupLimit = Number(migrated.settings.groupLimit);
@@ -163,6 +169,7 @@
     if (!value.drafts.every(draft => isObject(draft) &&
       isText(draft.id, 100) && isText(draft.text, 20000) &&
       isText(draft.url, 2048) && (!draft.url || isSafeHttpsUrl(draft.url)) &&
+      (draft.pageLink === undefined || (isText(draft.pageLink, 2048) && (!draft.pageLink || isSafeHttpsUrl(draft.pageLink)))) &&
       (draft.sourceUrl === undefined || (isText(draft.sourceUrl, 2048) && (!draft.sourceUrl || isSafeHttpsUrl(draft.sourceUrl)))) &&
       isText(draft.createdAt, 100) &&
       (draft.kind === undefined || ['source', 'share', 'ai'].includes(draft.kind)) &&

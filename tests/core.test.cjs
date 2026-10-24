@@ -228,3 +228,17 @@ test('contact records validate Facebook URLs and known manual statuses', () => {
   state.contacts[0].url = 'https://evil.example/profile/123';
   assert.equal(Core.isValidState(state), false);
 });
+
+
+test('draft source URLs remain distinct from external Page links', () => {
+  const state = Core.createDefaultState();
+  state.drafts.push({
+    id: 'source-link-draft', text: 'Post text', url: 'https://example.com/landing',
+    sourceUrl: 'https://www.facebook.com/posts/123',
+    createdAt: '2026-10-24T10:00:00.000Z', kind: 'ai', reviewStatus: 'published',
+    pageId: '12345678', postId: '12345678_98765432'
+  });
+  assert.equal(Core.isValidState(state), true);
+  state.drafts[0].sourceUrl = 'javascript:alert(1)';
+  assert.equal(Core.isValidState(state), false);
+});

@@ -185,3 +185,29 @@ test('legacy demo provider migrates to Meta AI Web by default', () => {
   assert.equal(migrated.settings.provider, 'meta');
   assert.equal(Core.isValidState(migrated), true);
 });
+
+
+test('legacy drafts migrate into the review queue without losing content', () => {
+  const legacy = Core.createDefaultState();
+  legacy.drafts.push({
+    id: 'legacy-draft', text: 'A draft created before review statuses',
+    url: '', createdAt: '2026-10-24T10:00:00.000Z', kind: 'ai'
+  });
+  const migrated = Core.migrateState(legacy);
+  assert.equal(migrated.drafts[0].text, 'A draft created before review statuses');
+  assert.equal(migrated.drafts[0].reviewStatus, 'draft');
+  assert.equal(Core.isValidState(migrated), true);
+});
+
+test('draft review lifecycle accepts known states and rejects unknown states', () => {
+  const state = Core.createDefaultState();
+  state.drafts.push({
+    id: 'review-draft', text: 'Ready for approval', url: '',
+    createdAt: '2026-10-24T10:00:00.000Z', kind: 'ai',
+    reviewStatus: 'approved', approvedAt: '2026-10-24T10:01:00.000Z',
+    pageId: '12345678', postId: '12345678_98765432'
+  });
+  assert.equal(Core.isValidState(state), true);
+  state.drafts[0].reviewStatus = 'auto-publish';
+  assert.equal(Core.isValidState(state), false);
+});

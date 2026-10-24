@@ -120,6 +120,25 @@
       '</section><section class="panel blue"><h2>Ghi chú nghiệp vụ</h2><div class="field"><label for="moduleNote">Ghi chú nội bộ</label><textarea id="moduleNote" maxlength="2000" placeholder="Ghi yêu cầu cho module này...">' + esc(note) + '</textarea></div>' +
       button('Lưu ghi chú', 'saveNote', 'primary') + '</section></div>';
   }
+  function renderConnect() {
+    const statusNames = { new: 'Chưa liên hệ', opened: 'Đã mở hồ sơ', request_sent: 'Đã gửi lời mời (đánh dấu thủ công)', connected: 'Đã kết nối', follow_up: 'Cần theo dõi', declined: 'Không tiếp tục' };
+    const contacts = (state.contacts || []).slice().reverse();
+    const list = contacts.length ? contacts.map(contact =>
+      '<article class="draft"><div class="draft-meta"><strong>' + esc(contact.name) + '</strong><span class="pill">' + esc(statusNames[contact.status] || contact.status) + '</span></div>' +
+      '<p class="draft-text">' + esc(contact.note || 'Chưa có ghi chú.') + '</p><small>' + esc(contact.url) + '</small>' +
+      '<div class="btnrow">' + button('Mở hồ sơ', 'openContact', 'primary', contact.id) +
+      (contact.status !== 'request_sent' ? button('Đã gửi lời mời', 'markContactSent', '', contact.id) : '') +
+      (contact.status !== 'connected' ? button('Đã kết nối', 'markContactConnected', '', contact.id) : '') +
+      (contact.status !== 'follow_up' ? button('Theo dõi lại', 'markContactFollowUp', '', contact.id) : '') +
+      button('Không tiếp tục', 'markContactDeclined', '', contact.id) + button('Xóa', 'deleteContact', 'warn', contact.id) + '</div></article>'
+    ).join('') : '<div class="placeholder">Chưa có hồ sơ nào. Thêm người cần liên hệ để theo dõi thủ công.</div>';
+    return '<div class="grid"><section class="panel blue"><h2>Danh sách liên hệ</h2><p>Quản lý hồ sơ và trạng thái liên hệ thủ công</p>' +
+      field('Tên người liên hệ', 'contactName', '') + field('URL hồ sơ Facebook', 'contactUrl', '') +
+      '<div class="field"><label for="contactNote">Ghi chú / lý do kết nối</label><textarea id="contactNote" maxlength="1000" placeholder="Bối cảnh, mối quan tâm chung, việc cần theo dõi..."></textarea></div>' +
+      button('Thêm vào danh sách', 'addContact', 'primary full') +
+      '<div class="banner">Extension không tự gửi lời mời kết bạn. Mở hồ sơ và gửi lời mời thủ công trên Facebook; sau đó cập nhật trạng thái tại đây.</div></section>' +
+      '<section class="panel"><h2>Hồ sơ đã lưu</h2><p>' + contacts.length + ' liên hệ</p>' + list + '</section></div>';
+  }
   function renderGroups() {
     const kindNames = { like: 'Thích', love: 'Yêu thích', support: 'Ủng hộ', comment: 'Bình luận', reply: 'Trả lời', followup: 'Theo dõi lại' };
     const engagementList = (state.engagementItems || []).slice().reverse().slice(0, 8);
@@ -294,6 +313,7 @@
       '<div class="banner">Bản nháp chỉ được lưu cục bộ. Kiểm tra nội dung trước khi sao chép hoặc sử dụng bên ngoài.</div>' + library + '</section></div>';
   }
   function renderPage() {
+    if (page === 'connect') return renderConnect();
     if (page === 'groups') return renderGroups();
     if (page === 'pages') return renderPages();
     if (page === 'review') return renderReviewQueue();
@@ -725,6 +745,49 @@
       case 'deleteEngagement':
         state.engagementItems = (state.engagementItems || []).filter(entry => entry.id !== id);
         log('Đã xóa mục theo dõi tương tác');
+        break;
+      case 'addContact': {
+        const name = $('#contactName').value.trim();
+        const url = $('#contactUrl').value.trim();
+        const note = $('#contactNote').value.trim();
+        if (!name || name.length > 200) { toast('Nhập tên người liên hệ hợp lệ.'); return; }
+        if (!Core.isSafeFacebookUrl(url)) { toast('URL hồ sơ phải thuộc Facebook và sử dụng HTTPS.'); return; }
+        if (note.length > 1000) { toast('Ghi chú không được vượt quá 1.000 ký tự.'); return; }
+        state.contacts = Array.isArray(state.contacts) ? state.contacts : [];
+        if (state.contacts.some(contact => contact.url === url)) { toast('Hồ sơ này đã có trong danh sách.'); return; }
+        if (state.contacts.length >= 1000) { toast('Danh sách đã đạt giới hạn 1.000 hồ sơ.'); return; }
+        state.contacts.push({ id: crypto.randomUUID(), name, url, note, status: 'new', createdAt: new Date().toISOString() });
+        log('Đã thêm hồ sơ liên hệ: ' + name);
+        break;
+      }
+      case 'openContact': {
+        const contact = (state.contacts || []).find(item => item.id === id);
+        if (!contact || !Core.isSafeFacebookUrl(contact.url)) { toast('URL hồ sơ không hợp lệ.'); return; }
+        await chrome.tabs.create({ url: contact.url });
+        if (contact.status === 'new') contact.status = 'opened';
+        contact.updatedAt = new Date().toISOString();
+        log('Đã mở hồ sơ liên hệ: ' + contact.name);
+        break;
+      }
+      case 'markContactSent':
+      case 'markContactConnected':
+      case 'markContactFollowUp':
+      case 'markContactDeclined': {
+        const contact = (state.contacts || []).find(item => item.id === id);
+        if (!contact) { toast('Không tìm thấy hồ sơ liên hệ.'); return; }
+        contact.status = ({
+          markContactSent: 'request_sent',
+          markContactConnected: 'connected',
+          markContactFollowUp: 'follow_up',
+          markContactDeclined: 'declined'
+        })[name];
+        contact.updatedAt = new Date().toISOString();
+        log('Đã cập nhật trạng thái liên hệ: ' + contact.name + ' · ' + contact.status);
+        break;
+      }
+      case 'deleteContact':
+        state.contacts = (state.contacts || []).filter(contact => contact.id !== id);
+        log('Đã xóa hồ sơ liên hệ');
         break;
       case 'addGroup': {
         const nameValue = $('#groupName').value.trim();

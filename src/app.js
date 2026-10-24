@@ -228,9 +228,12 @@
     ).join('') : '<div class="placeholder">Chưa có hồ sơ nào. Thêm người cần liên hệ để theo dõi thủ công.</div>';
     const connectPrompt = state.prompts.connect || 'Soạn lời mời kết nối ngắn gọn, lịch sự dựa trên thông tin được cung cấp: {content}';
     return '<div class="grid"><section class="panel blue"><h2>Danh sách liên hệ</h2><p>Quản lý hồ sơ và trạng thái liên hệ thủ công</p>' +
-      field('Tên người liên hệ', 'contactName', '') + field('URL hồ sơ Facebook', 'contactUrl', '') +
+      field('Tên người liên hệ', 'contactName', '') + field('URL hồ sơ Facebook', 'contactUrl', '') + field('Facebook ID (không bắt buộc)', 'contactFacebookId', '') +
       '<div class="field"><label for="contactNote">Ghi chú / lý do kết nối</label><textarea id="contactNote" maxlength="1000" placeholder="Bối cảnh, mối quan tâm chung, việc cần theo dõi..."></textarea></div>' +
       button('Thêm vào danh sách', 'addContact', 'primary full') +
+      '<input id="contactImportFile" type="file" accept=".csv,text/csv" style="display:none">' +
+      '<div class="btnrow">' + button('Nhập danh sách đối chiếu CSV', 'importContacts') + button('Xuất danh sách liên hệ CSV', 'exportContactsCsv') + '</div>' +
+      '<div class="banner">Tệp Excel (.xlsx) cần được lưu thành CSV UTF-8 trước khi nhập. Đối chiếu ưu tiên URL/ID hồ sơ rồi mới đến tên.</div>' +
       '<div class="banner">Extension không tự gửi lời mời kết bạn. Mở hồ sơ và gửi lời mời thủ công trên Facebook; sau đó cập nhật trạng thái tại đây.</div></section>' +
       '<section class="panel purple"><h2>Soạn lời mời bằng AI</h2><p>Tạo lời mời lịch sự dựa trên thông tin bạn cung cấp. Không gửi tự động.</p>' +
       '<div class="field"><label for="modulePrompt">Prompt</label><textarea id="modulePrompt" maxlength="20000">' + esc(connectPrompt) + '</textarea></div>' +
@@ -954,17 +957,36 @@
         break;
       case 'addContact': {
         const name = $('#contactName').value.trim();
-        const url = $('#contactUrl').value.trim();
+        let url = $('#contactUrl').value.trim();
+        let facebookId = $('#contactFacebookId') ? $('#contactFacebookId').value.trim() : '';
         const note = $('#contactNote').value.trim();
         if (!name || name.length > 200) { toast('Nhập tên người liên hệ hợp lệ.'); return; }
-        if (!Core.isSafeFacebookUrl(url)) { toast('URL hồ sơ phải thuộc Facebook và sử dụng HTTPS.'); return; }
+        if (facebookId && !/^[0-9]{1,30}$/.test(facebookId)) { toast('Facebook ID phải gồm 1–30 chữ số.'); return; }
+        if (url && !Core.isSafeFacebookUrl(url)) { toast('URL hồ sơ phải thuộc Facebook và sử dụng HTTPS.'); return; }
+        if (!facebookId && url) facebookId = facebookIdFromUrl(url);
+        if (!url && facebookId) url = 'https://www.facebook.com/profile.php?id=' + encodeURIComponent(facebookId);
+        if (!url) { toast('Nhập URL hồ sơ Facebook hoặc Facebook ID.'); return; }
         if (note.length > 1000) { toast('Ghi chú không được vượt quá 1.000 ký tự.'); return; }
         state.contacts = Array.isArray(state.contacts) ? state.contacts : [];
-        if (state.contacts.some(contact => contact.url === url)) { toast('Hồ sơ này đã có trong danh sách.'); return; }
+        const urlKey = normalizeProfileUrl(url);
+        if (state.contacts.some(contact => (urlKey && normalizeProfileUrl(contact.url) === urlKey) || (facebookId && (contact.facebookId === facebookId || facebookIdFromUrl(contact.url) === facebookId)))) { toast('Hồ sơ này đã có trong danh sách theo URL/ID.'); return; }
         if (state.contacts.length >= 1000) { toast('Danh sách đã đạt giới hạn 1.000 hồ sơ.'); return; }
-        state.contacts.push({ id: crypto.randomUUID(), name, url, note, status: 'new', createdAt: new Date().toISOString() });
+        state.contacts.push({ id: crypto.randomUUID(), name, url, ...(facebookId ? { facebookId } : {}), note, status: 'new', createdAt: new Date().toISOString() });
         log('Đã thêm hồ sơ liên hệ: ' + name);
         break;
+      }
+      case 'importContacts': {
+        const input = $('#contactImportFile');
+        if (!input) { toast('Không tìm thấy ô chọn tệp CSV.'); return; }
+        input.click();
+        return;
+      }
+      case 'exportContactsCsv': {
+        const rows = [['Tên', 'URL hồ sơ Facebook', 'Facebook ID', 'Trạng thái', 'Ghi chú', 'Ngày tạo', 'Cập nhật']];
+        for (const contact of state.contacts || []) rows.push([contact.name, contact.url, contact.facebookId || facebookIdFromUrl(contact.url), contact.status, contact.note, contact.createdAt, contact.updatedAt || '']);
+        download('facebook-ai-contacts.csv', '\ufeff' + Core.toCsv(rows), 'text/csv;charset=utf-8');
+        toast('Đã xuất danh sách liên hệ CSV để mở bằng Excel.');
+        return;
       }
       case 'openContact': {
         const contact = (state.contacts || []).find(item => item.id === id);
@@ -1751,6 +1773,7 @@
       if (event.target.id === 'pagePublishTime') pageComposerSchedule = event.target.value;
     });
     document.addEventListener('change', event => {
+      if (event.target.id === 'contactImportFile') { importContactsCsvFile(event).catch(error => toast(error.message || 'Không thể nhập CSV.')); return; }
       if (!event.target.classList.contains('group-check')) return;
       const group = state.groups.find(item => item.id === event.target.dataset.id);
       if (!group) return;

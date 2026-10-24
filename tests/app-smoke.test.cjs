@@ -78,6 +78,9 @@ test('header distinguishes Meta AI Web status from Facebook Page API setup', asy
   assert.match(elements['#connectionStatus'].textContent, /Facebook Page API chưa cấu hình/);
   assert.doesNotMatch(elements['#connectionStatus'].textContent, /chưa kết nối Facebook/);
 
+  listeners['document:click']({ target: { closest(selector) {
+    return selector === '[data-nav]' ? { dataset: { nav: 'ai' } } : null;
+  } } });
   elements['#metaWebPrompt'].value = 'Hãy biên tập nội dung sau: {content}';
   elements['#metaWebInput'].value = 'Viết lời giới thiệu ngắn.';
   listeners['document:click']({ target: { closest(selector) {

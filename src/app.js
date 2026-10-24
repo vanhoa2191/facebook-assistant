@@ -112,6 +112,7 @@
     return '<div class="grid"><section class="panel blue"><h2>' + esc(title) + '</h2><p>' + esc(description) + '</p>' +
       '<div class="field"><label for="modulePrompt">Prompt</label><textarea id="modulePrompt" maxlength="20000">' + esc(prompt) + '</textarea></div>' +
       '<div class="field"><label for="moduleInput">' + esc(inputLabel) + '</label><textarea id="moduleInput" maxlength="20000" placeholder="Dán nội dung hoặc nhập yêu cầu..."></textarea></div>' +
+      field(page === 'connect' ? 'Link hồ sơ Facebook (không gửi lời mời)' : page === 'scrape' ? 'Link bài viết Facebook (không tự cào)' : 'Link nguồn HTTPS (không bắt buộc)', 'moduleSourceUrl', '') +
       '<div class="btnrow">' + button(state.settings.provider === 'gemini' ? 'Tạo nháp bằng Gemini' : 'Tạo nháp bằng Meta AI Web', 'generateModuleDraft', 'primary') + button('Sao chép prompt', 'copyModulePrompt') + '</div>' +
       '<div class="field"><label for="moduleOutput">Kết quả từ Meta AI hoặc AI bên ngoài</label><textarea id="moduleOutput" maxlength="20000" placeholder="Dán kết quả AI đã tạo ở bên ngoài..."></textarea></div>' +
       '<div class="btnrow">' + button('Lưu kết quả AI thành nháp', 'saveModuleOutputDraft') + button('Lưu nội dung nguồn', 'saveModuleDraft') + '</div>' +
@@ -1044,8 +1045,14 @@
       }
       case 'saveModuleOutputDraft': {
         const output = $('#moduleOutput').value.trim();
+        const sourceUrl = $('#moduleSourceUrl') ? $('#moduleSourceUrl').value.trim() : '';
         if (!output || output.length > 20000) { toast('Dán kết quả AI hợp lệ trước khi lưu'); return; }
-        addDraft(output, '', 'ai');
+        if (sourceUrl) {
+          let validSource = false;
+          try { validSource = new URL(sourceUrl).protocol === 'https:' && sourceUrl.length <= 2048; } catch (_) {}
+          if (!validSource) { toast('Link nguồn phải là HTTPS hợp lệ.'); return; }
+        }
+        addDraft(output, sourceUrl, 'ai');
         log('Đã lưu kết quả AI bên ngoài: ' + TITLES[page]);
         break;
       }
@@ -1158,17 +1165,24 @@
       case 'generateModuleDraft': {
         const input = $('#moduleInput').value.trim();
         const template = $('#modulePrompt').value.trim();
+        const sourceUrl = $('#moduleSourceUrl') ? $('#moduleSourceUrl').value.trim() : '';
         if (!input || input.length > 20000) { toast('Nhập nội dung đầu vào hợp lệ'); return; }
+        if (sourceUrl) {
+          let validSource = false;
+          try { validSource = new URL(sourceUrl).protocol === 'https:' && sourceUrl.length <= 2048; } catch (_) {}
+          if (!validSource) { toast('Link nguồn phải là HTTPS hợp lệ.'); return; }
+        }
         const promptKey = modulePromptKey();
         state.prompts[promptKey] = template.slice(0, 20000);
         let prompt = Core.fillPrompt(state.prompts[promptKey], { content: input });
         if (!state.prompts[promptKey].includes('{content}')) prompt += '\n\nNội dung được cung cấp:\n' + input;
+        if (sourceUrl) prompt += '\n\nLiên kết tham chiếu do người dùng cung cấp (không đảm bảo AI có thể truy cập): ' + sourceUrl;
         try {
           const output = state.settings.provider === 'gemini'
             ? await geminiRequest(prompt)
             : await generateWithMetaAiWeb(prompt);
           if (!output) return;
-          addDraft(output, '', 'ai');
+          addDraft(output, sourceUrl, 'ai');
           if (state.settings.provider !== 'gemini') metaWebLastSuccess = true;
           log(state.settings.provider === 'gemini' ? 'Đã tạo bản nháp bằng Gemini: ' + TITLES[page] : 'Đã tạo bản nháp bằng Meta AI Web: ' + TITLES[page]);
           break;
@@ -1181,10 +1195,16 @@
       }
       case 'saveModuleDraft': {
         const input = $('#moduleInput').value.trim();
+        const sourceUrl = $('#moduleSourceUrl') ? $('#moduleSourceUrl').value.trim() : '';
         if (!input || input.length > 20000) { toast('Nhập nội dung đầu vào hợp lệ'); return; }
+        if (sourceUrl) {
+          let validSource = false;
+          try { validSource = new URL(sourceUrl).protocol === 'https:' && sourceUrl.length <= 2048; } catch (_) {}
+          if (!validSource) { toast('Link nguồn phải là HTTPS hợp lệ.'); return; }
+        }
         const promptKey = modulePromptKey();
         state.prompts[promptKey] = $('#modulePrompt').value.slice(0, 20000);
-        addDraft(input, '', 'source');
+        addDraft(input, sourceUrl, 'source');
         log('Đã lưu nội dung nguồn từ module: ' + TITLES[page]);
         break;
       }

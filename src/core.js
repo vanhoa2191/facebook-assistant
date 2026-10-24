@@ -12,7 +12,7 @@
 
   function createDefaultState() {
     return {
-      settings: { language: 'vi', speed: 'normal', provider: 'meta', model: '', groupLimit: 10, delay: 0, pageId: '', graphVersion: 'v26.0' },
+      settings: { language: 'vi', speed: 'normal', provider: 'meta', model: '', groupLimit: 10, delay: 0, pageId: '', graphVersion: 'v26.0', fontScale: 1.2 },
       groups: [],
       contacts: [],
       observations: [],
@@ -66,6 +66,9 @@
     migrated.settings.groupLimit = Number.isFinite(groupLimit) ? Math.min(10, Math.max(1, Math.floor(groupLimit))) : 10;
     const delay = Number(migrated.settings.delay);
     migrated.settings.delay = Number.isFinite(delay) ? Math.min(5, Math.max(0, Math.floor(delay))) : 0;
+    const fontScale = Number(migrated.settings.fontScale);
+    migrated.settings.fontScale = Number.isFinite(fontScale) && fontScale >= 1 && fontScale <= 1.4
+      ? Math.round(fontScale * 10) / 10 : defaults.settings.fontScale;
     return migrated;
   }
 
@@ -124,7 +127,8 @@
         settings.groupLimit < 1 || settings.groupLimit > 10 ||
         !Number.isFinite(settings.delay) || settings.delay < 0 || settings.delay > 5 ||
         (settings.pageId !== undefined && settings.pageId !== '' && !/^[0-9]{5,30}$/.test(settings.pageId)) ||
-        (settings.graphVersion !== undefined && !/^v[0-9]{1,2}\.0$/.test(settings.graphVersion))) return false;
+        (settings.graphVersion !== undefined && !/^v[0-9]{1,2}\.0$/.test(settings.graphVersion)) ||
+        (settings.fontScale !== undefined && (!Number.isFinite(settings.fontScale) || settings.fontScale < 1 || settings.fontScale > 1.4))) return false;
     if (!isText(value.prompts.share, 20000) || !Object.entries(value.prompts).every(([key, prompt]) =>
       isText(key, 80) && isText(prompt, 20000))) return false;
 

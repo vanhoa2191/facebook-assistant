@@ -264,3 +264,20 @@ test('legacy group batch settings are clamped to safe bounds without losing save
   assert.equal(migrated.groups[0].id, 'g-safe');
   assert.equal(Core.isValidState(migrated), true);
 });
+
+
+test('legacy published Page drafts migrate their attachment link without losing source URLs', () => {
+  const legacy = Core.createDefaultState();
+  legacy.drafts.push({
+    id: 'published-legacy', text: 'Published post',
+    url: 'https://example.com/landing',
+    sourceUrl: 'https://www.facebook.com/posts/123',
+    createdAt: '2026-10-24T10:00:00.000Z', kind: 'ai',
+    reviewStatus: 'published', pageId: '12345678',
+    postId: '12345678_98765432'
+  });
+  const migrated = Core.migrateState(legacy);
+  assert.equal(migrated.drafts[0].pageLink, 'https://example.com/landing');
+  assert.equal(migrated.drafts[0].sourceUrl, 'https://www.facebook.com/posts/123');
+  assert.equal(Core.isValidState(migrated), true);
+});

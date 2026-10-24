@@ -9,23 +9,25 @@
   const GRAPH_ORIGIN = 'https://graph.facebook.com/*';
   const PAGE_TOKEN_KEY = 'faa.facebookPageToken';
   const META_AI_ORIGINS = ['https://meta.ai/*', 'https://www.meta.ai/*'];
+  const FACEBOOK_CAPTURE_ORIGINS = ['https://www.facebook.com/*', 'https://web.facebook.com/*', 'https://m.facebook.com/*'];
   const NAV = [
     ['connect', '♧', 'Kết bạn'], ['scrape', '▤', 'Cào bài'], ['groups', '♧', 'Nhóm'],
     ['pages', '⚑', 'Nuôi Page'], ['share', '↗', 'Share bài'], ['sales', '▣', 'Đăng bán'],
     ['learn', '▥', 'Học nhóm'], ['feed', '◉', 'Bản tin & AI'], ['engage', '♡', 'Lấy lại tương tác'],
-    ['ai', '⚙', 'AI chung'], ['review', '✓', 'Duyệt bài'], ['schedule', '▦', 'Lịch chạy'], ['logs', '▤', 'Nhật ký']
+    ['ai', '⚙', 'AI chung'], ['review', '✓', 'Duyệt bài'], ['analytics', '▥', 'Phân tích'], ['schedule', '▦', 'Lịch chạy'], ['logs', '▤', 'Nhật ký']
   ];
   const TITLES = {
     connect: 'Kết bạn', scrape: 'Cào bài', groups: 'Quản lý nhóm và tương tác', pages: 'Nuôi Page',
     share: 'Share bài vào nhóm đã tham gia', sales: 'Đăng bán', learn: 'Học nhóm',
     feed: 'Bản tin & AI', engage: 'Lấy lại tương tác', ai: 'Hồ sơ AI dùng chung',
-    review: 'Hàng đợi duyệt bài', schedule: 'Lịch chạy', logs: 'Nhật ký'
+    review: 'Hàng đợi duyệt bài', analytics: 'Phân tích & báo cáo', schedule: 'Lịch chạy', logs: 'Nhật ký'
   };
   const DESCS = {
     groups: 'Quản lý nhóm đã tham gia, lựa chọn nhóm và chuẩn bị nội dung.',
     ai: 'Cấu hình AI Provider, prompt và hồ sơ theo từng chức năng.',
     logs: 'Theo dõi thao tác, lỗi và xuất dữ liệu.',
     review: 'Kiểm tra, duyệt hoặc từ chối bản nháp trước khi đăng.',
+    analytics: 'Theo dõi lịch sử quan sát, tổng hợp báo cáo 7 ngày và xuất CSV mở bằng Excel.',
     share: 'Chuẩn bị nội dung chia sẻ với lời dẫn theo từng nhóm.'
   };
   const $ = selector => document.querySelector(selector);
@@ -152,6 +154,56 @@
       '<div class="banner">Kiểm tra thông tin và giọng điệu trước khi sử dụng. Extension không gửi lời mời, tin nhắn hoặc yêu cầu kết bạn.</div><h3>Nháp gần đây</h3>' + draftList(5) + '</section>' +
       '<section class="panel"><h2>Hồ sơ đã lưu</h2><p>' + contacts.length + ' liên hệ</p>' + list + '</section></div>';
   }
+  function renderScrape() {
+    const contacts = (state.contacts || []).slice().sort((a, b) => a.name.localeCompare(b.name));
+    const contactOptions = '<option value="">Chưa gán hồ sơ</option>' + contacts.map(contact =>
+      '<option value="' + esc(contact.id) + '">' + esc(contact.name) + '</option>'
+    ).join('');
+    const observations = (state.observations || []).slice().reverse();
+    const cards = observations.length ? observations.slice(0, 30).map(item =>
+      '<article class="draft"><div class="draft-meta"><span class="pill">' + esc(item.contactName || 'Chưa gán hồ sơ') + '</span><time>' + esc(item.capturedAt) + '</time></div>' +
+      '<p class="draft-text">' + esc(item.text.slice(0, 600)) + (item.text.length > 600 ? '…' : '') + '</p>' +
+      (item.analysisText ? '<div class="banner"><strong>Phân tích AI:</strong> ' + esc(item.analysisText.slice(0, 700)) + (item.analysisText.length > 700 ? '…' : '') + '</div>' : '') +
+      '<div class="btnrow">' + button(item.analysisText ? 'Phân tích lại' : 'Phân tích bằng AI', 'analyzeObservation', 'primary', item.id) +
+      button('Mở nguồn', 'openObservationSource', '', item.id) + button('Xóa quan sát', 'deleteObservation', 'warn', item.id) + '</div></article>'
+    ).join('') : '<div class="placeholder">Chưa có quan sát. Mở một bài viết Facebook riêng, rồi bấm nút thu thập để lưu phần đang hiển thị.</div>';
+    return '<div class="grid"><section class="panel blue"><h2>Thu thập bài viết đang mở</h2><p>Chỉ đọc nội dung hiển thị của bài viết riêng mà bạn chủ động mở, gồm các bình luận/phản hồi đang được tải trên trang.</p>' +
+      '<div class="field"><label for="observationContactId">Gán quan sát vào hồ sơ liên hệ</label><select id="observationContactId">' + contactOptions + '</select></div>' +
+      button('Thu thập bài đang mở', 'captureCurrentFacebookPost', 'primary full') +
+      '<div class="banner">Không quét toàn bộ bảng tin, không tự cuộn để tải thêm, không đọc cookie/token và không vượt qua quyền truy cập. Hãy mở bài viết riêng và tự tải các bình luận cần phân tích trước khi thu thập.</div>' +
+      '<h3>Phân tích văn bản bạn cung cấp</h3><div class="field"><label for="modulePrompt">Prompt tóm tắt</label><textarea id="modulePrompt" maxlength="20000">' + esc(state.prompts.summary || 'Tóm tắt nội dung sau: {content}') + '</textarea></div>' +
+      '<div class="field"><label for="moduleInput">Nội dung bài viết/bình luận</label><textarea id="moduleInput" maxlength="20000" placeholder="Dán nội dung bạn được phép xem..."></textarea></div>' +
+      field('URL nguồn HTTPS (không bắt buộc)', 'moduleSourceUrl', '') +
+      '<div class="btnrow">' + button(state.settings.provider === 'gemini' ? 'Tạo nháp tóm tắt bằng Gemini' : 'Tạo nháp tóm tắt bằng Meta AI Web', 'generateModuleDraft', 'primary') + button('Sao chép prompt', 'copyModulePrompt') + '</div>' +
+      '<div class="field"><label for="moduleOutput">Kết quả AI bên ngoài (nếu cần)</label><textarea id="moduleOutput" maxlength="20000" placeholder="Dán kết quả AI..."></textarea></div>' +
+      '<div class="btnrow">' + button('Lưu kết quả AI thành nháp', 'saveModuleOutputDraft') + button('Lưu nội dung nguồn', 'saveModuleDraft') + '</div></section>' +
+      '<section class="panel"><h2>Lịch sử quan sát</h2><p>' + observations.length + ' quan sát đã lưu · ' + contacts.length + ' hồ sơ có thể gán</p>' + cards + '</section></div>';
+  }
+
+  function renderAnalytics() {
+    const preview = Core.buildWeeklyReport(state, Date.now());
+    const observations = (state.observations || []).slice().reverse();
+    const reports = (state.weeklyReports || []).slice().reverse();
+    const reportCards = reports.length ? reports.map(report =>
+      '<article class="draft"><div class="draft-meta"><span class="pill">' + esc(report.observationsCount + ' quan sát · ' + report.profilesCount + ' hồ sơ') + '</span><time>' + esc(report.createdAt) + '</time></div>' +
+      '<p class="draft-text">' + esc(report.summary) + '</p>' +
+      (report.aiSummary ? '<div class="banner"><strong>Tóm tắt AI:</strong> ' + esc(report.aiSummary) + '</div>' : '') +
+      '<div class="btnrow">' + button(report.aiSummary ? 'Tạo lại tóm tắt AI' : 'Tạo tóm tắt AI', 'generateWeeklyAiSummary', 'primary', report.id) +
+      button('Xuất báo cáo CSV', 'exportWeeklyReport', '', report.id) + button('Xóa báo cáo', 'deleteWeeklyReport', 'warn', report.id) + '</div></article>'
+    ).join('') : '<div class="placeholder">Chưa có báo cáo. Có thể tạo báo cáo thống kê ngay cả khi kỳ hiện tại chưa có dữ liệu.</div>';
+    return '<div class="grid"><section class="panel blue"><h2>Phân tích & báo cáo 7 ngày</h2><p>Báo cáo định kỳ chạy cục bộ; tóm tắt AI chỉ gửi dữ liệu đi khi bạn chủ động bấm nút.</p>' +
+      '<div class="metric"><div><small>Quan sát đang lưu</small><span>' + observations.length + '</span></div><div><small>Hồ sơ đã gán</small><span>' + new Set(observations.map(item => item.contactId || item.contactName).filter(Boolean)).size + '</span></div><div><small>Báo cáo đã lưu</small><span>' + reports.length + '</span></div><div><small>Kỳ gần nhất</small><span>' + preview.observationsCount + '</span></div></div>' +
+      '<div class="banner">' + esc(preview.summary) + '</div>' +
+      '<div class="btnrow">' + button('Tổng hợp ngay bằng AI', 'summarizeNow', 'primary') + button('Tạo báo cáo thống kê', 'createWeeklyReportNow') + '</div>' +
+      '<div class="btnrow">' + button('Xuất báo cáo CSV (Excel)', 'exportWeeklyReportsCsv') + button('Xuất lịch sử quan sát CSV (Excel)', 'exportObservationsCsv') + '</div>' +
+      '<div class="banner">Báo cáo tự động hàng tuần chỉ tổng hợp số liệu và nội dung đã lưu. Để phân tích sắc thái/quan điểm theo ngữ cảnh, hãy dùng nút AI; không suy đoán thuộc tính nhạy cảm.</div></section>' +
+      '<section class="panel"><h2>Báo cáo đã tạo</h2>' + reportCards + '</section>' +
+      '<section class="panel"><h2>Quan sát gần đây</h2>' + (observations.slice(0, 10).map(item =>
+        '<div class="task"><div><strong>' + esc(item.contactName || 'Chưa gán hồ sơ') + '</strong><time>' + esc(item.capturedAt) + '</time><p class="task-draft">' + esc(item.text.slice(0, 140)) + '</p></div>' +
+        button('Mở nguồn', 'openObservationSource', 'primary', item.id) + '</div>'
+      ).join('') || '<div class="placeholder">Chưa có dữ liệu.</div>') + '</section></div>';
+  }
+
   function renderGroups() {
     const kindNames = { like: 'Thích', love: 'Yêu thích', support: 'Ủng hộ', comment: 'Bình luận', reply: 'Trả lời', followup: 'Theo dõi lại' };
     const engagementList = (state.engagementItems || []).slice().reverse().slice(0, 8);
@@ -329,6 +381,8 @@
   }
   function renderPage() {
     if (page === 'connect') return renderConnect();
+    if (page === 'scrape') return renderScrape();
+    if (page === 'analytics') return renderAnalytics();
     if (page === 'groups') return renderGroups();
     if (page === 'pages') return renderPages();
     if (page === 'review') return renderReviewQueue();

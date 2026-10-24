@@ -14,6 +14,7 @@
     return {
       settings: { language: 'vi', speed: 'normal', provider: 'meta', model: '', groupLimit: 10, delay: 30, pageId: '', graphVersion: 'v26.0' },
       groups: [],
+      contacts: [],
       profiles: [],
       tasks: [],
       logs: [],
@@ -89,7 +90,7 @@
 
   function isValidState(value) {
     if (!isObject(value) || !isObject(value.settings) || !isObject(value.prompts)) return false;
-    const arrayKeys = ['groups', 'profiles', 'tasks', 'logs', 'drafts', 'pageSchedules', 'engagementItems'];
+    const arrayKeys = ['groups', 'contacts', 'profiles', 'tasks', 'logs', 'drafts', 'pageSchedules', 'engagementItems'];
     if (!arrayKeys.every(key => isBoundedArray(value[key]))) return false;
     if (!isObject(value.moduleNotes) && value.moduleNotes !== undefined) return false;
 
@@ -106,6 +107,13 @@
       isText(group.id, 100) && group.id.length > 0 &&
       isText(group.name, 200) && group.name.trim().length > 0 &&
       isSafeFacebookGroupUrl(group.url) && typeof group.selected === 'boolean')) return false;
+    if (!value.contacts.every(contact => isObject(contact) &&
+      isText(contact.id, 100) && contact.id.length > 0 &&
+      isText(contact.name, 200) && contact.name.trim().length > 0 &&
+      isSafeFacebookUrl(contact.url) && isText(contact.note, 1000) &&
+      ['new', 'opened', 'request_sent', 'connected', 'follow_up', 'declined'].includes(contact.status) &&
+      isText(contact.createdAt, 100) &&
+      (contact.updatedAt === undefined || isText(contact.updatedAt, 100)))) return false;
     if (!value.engagementItems.every(item => isObject(item) &&
       isText(item.id, 100) && item.id.length > 0 &&
       isText(item.name, 200) && item.name.trim().length > 0 &&

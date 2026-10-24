@@ -54,7 +54,7 @@ function loadApp() {
     },
     scripting: { executeScript: async () => [{}] }
   };
-  const context = { window, document, chrome, crypto, navigator: { clipboard: { writeText: async () => {} } } };
+  const context = { window, document, chrome, crypto, setTimeout, clearTimeout, Date, URL, Blob, navigator: { clipboard: { writeText: async () => {} } } };
   const appPath = path.join(__dirname, '..', 'src', 'app.js');
   vm.runInNewContext(fs.readFileSync(appPath, 'utf8'), context, { filename: 'src/app.js' });
   return { elements, listeners };

@@ -14,14 +14,17 @@ function loadBridge(options) {
   let visibleComposer = settings.visibleComposer !== false;
 
   const textareaPrototype = {};
-  Object.defineProperty(textareaPrototype, 'value', {
-    get() { return this._value || ''; },
-    set(value) { this._value = value; }
-  });
+  const inputPrototype = {};
+  for (const prototype of [textareaPrototype, inputPrototype]) {
+    Object.defineProperty(prototype, 'value', {
+      get() { return this._value || ''; },
+      set(value) { this._value = value; }
+    });
+  }
 
-  const composer = Object.create(textareaPrototype);
+  const composer = Object.create(settings.composerType === 'input' ? inputPrototype : textareaPrototype);
   Object.assign(composer, {
-    tagName: 'TEXTAREA',
+    tagName: settings.composerType === 'input' ? 'INPUT' : 'TEXTAREA',
     isConnected: true,
     disabled: false,
     isContentEditable: false,
@@ -55,7 +58,7 @@ function loadBridge(options) {
 
   const document = {
     querySelectorAll(selector) {
-      if (selector.startsWith('textarea, [contenteditable')) return visibleComposer ? [composer] : [];
+      if (selector.startsWith('textarea, input[type="text"]')) return visibleComposer ? [composer] : [];
       if (selector.startsWith('[data-message-author-role')) return assistantMessages;
       if (selector === 'button, [role="button"]') return [sendButton];
       if (selector === 'button, [role="button"], [aria-label]') return [sendButton];
@@ -76,7 +79,7 @@ function loadBridge(options) {
   function HTMLTextAreaElement() {}
   HTMLTextAreaElement.prototype = textareaPrototype;
   function HTMLInputElement() {}
-  HTMLInputElement.prototype = {};
+  HTMLInputElement.prototype = inputPrototype;
 
   const context = {
     window, document, chrome, Event, InputEvent, HTMLTextAreaElement, HTMLInputElement,
@@ -128,4 +131,17 @@ test('Meta AI Web bridge rejects empty and oversized prompts', async () => {
   });
   assert.equal(oversized.ok, false);
   assert.match(oversized.error, /1 đến 20.000/);
+});
+
+
+test('Meta AI Web bridge also supports a visible text input composer', async () => {
+  const bridge = loadBridge({ composerType: 'input' });
+  const response = await new Promise(resolve => {
+    bridge.listeners[0]({
+      type: 'FAA_META_AI_WEB_GENERATE',
+      prompt: 'Write from a text input.'
+    }, {}, resolve);
+  });
+  assert.equal(response.ok, true);
+  assert.match(bridge.getSentPrompt(), /Write from a text input/);
 });

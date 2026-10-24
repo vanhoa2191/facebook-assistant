@@ -75,6 +75,8 @@ test('navigation opens the AI and sales modules without runtime errors', async (
   } } });
   assert.equal(elements['#pageTitle'].textContent, 'Hồ sơ AI dùng chung');
   assert.match(elements['#view'].innerHTML, /Cấp quyền Gemini API/);
+  assert.match(elements['#view'].innerHTML, /Cấp quyền và mở Meta AI/);
+  assert.match(elements['#view'].innerHTML, /Gửi sang Meta AI Web và lưu nháp/);
 
   click({ target: { closest(selector) {
     return selector === '[data-nav]' ? { dataset: { nav: 'sales' } } : null;

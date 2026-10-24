@@ -515,7 +515,19 @@
     status.textContent = '● Chạy cục bộ · ' + aiStatus + ' · ' + pageStatus;
     status.title = 'Meta AI Web và Facebook Page API là hai kết nối riêng. Cấu hình Page API chưa có nghĩa token đã được xác minh với Meta.';
   }
+  function applyFontScale() {
+    const allowed = [1, 1.1, 1.2, 1.3, 1.4];
+    const storedScale = Number(state.settings && state.settings.fontScale);
+    const scale = allowed.includes(storedScale) ? storedScale : 1.2;
+    if (document.documentElement && document.documentElement.style &&
+        typeof document.documentElement.style.setProperty === 'function') {
+      document.documentElement.style.setProperty('--font-scale', String(scale));
+    }
+    const selector = $('#fontSizeSelect');
+    if (selector) selector.value = String(scale);
+  }
   function render() {
+    applyFontScale();
     $('#sidebar').innerHTML = NAV.map(item =>
       '<button type="button" class="nav ' + (page === item[0] ? 'active' : '') + '" data-nav="' + item[0] + '"><span class="symbol" aria-hidden="true">' + item[1] + '</span><span>' + esc(item[2]) + '</span></button>'
     ).join('');
@@ -1782,6 +1794,19 @@
       if (event.target.id === 'pagePublishTime') pageComposerSchedule = event.target.value;
     });
     document.addEventListener('change', event => {
+      if (event.target.id === 'fontSizeSelect') {
+        const scale = Number(event.target.value);
+        if (![1, 1.1, 1.2, 1.3, 1.4].includes(scale)) {
+          applyFontScale();
+          toast('Cỡ chữ không hợp lệ.');
+          return;
+        }
+        state.settings.fontScale = scale;
+        applyFontScale();
+        save().then(() => toast('Đã lưu cỡ chữ ' + Math.round(scale * 100) + '%.'))
+          .catch(() => toast('Không thể lưu cỡ chữ.'));
+        return;
+      }
       if (event.target.id === 'contactImportFile') { importContactsCsvFile(event).catch(error => toast(error.message || 'Không thể nhập CSV.')); return; }
       if (!event.target.classList.contains('group-check')) return;
       const group = state.groups.find(item => item.id === event.target.dataset.id);
